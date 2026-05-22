@@ -123,6 +123,21 @@ Available scenarios: job interview, restaurant ordering, hotel check-in, doctor 
         initSpeechRecognition();
         applySettings();
         
+        // Handle visual viewport resizing (mobile keyboard / browser chrome)
+        if (window.visualViewport) {
+            const updateViewportHeight = () => {
+                const vh = window.visualViewport.height;
+                document.documentElement.style.setProperty('--vh', `${vh}px`);
+                // Scroll chat to bottom to keep messages visible when keyboard is opened
+                if (document.activeElement === dom.textInput) {
+                    scrollToBottom();
+                }
+            };
+            window.visualViewport.addEventListener('resize', updateViewportHeight);
+            window.visualViewport.addEventListener('scroll', updateViewportHeight);
+            updateViewportHeight();
+        }
+
         // Show setup overlay if no API key is present
         if (!state.apiKey) {
             dom.setupOverlay.classList.remove('hidden');
@@ -144,6 +159,9 @@ Available scenarios: job interview, restaurant ordering, hotel check-in, doctor 
         dom.textInput.addEventListener('input', autoResize);
         dom.textInput.addEventListener('keydown', (e) => {
             if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
+        });
+        dom.textInput.addEventListener('focus', () => {
+            setTimeout(scrollToBottom, 150);
         });
         dom.sendBtn.addEventListener('click', sendMessage);
         dom.micBtn.addEventListener('click', toggleRecording);
