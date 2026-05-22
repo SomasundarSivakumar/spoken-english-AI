@@ -216,7 +216,7 @@ Available scenarios: job interview, restaurant ordering, hotel check-in, doctor 
         // Close sidebar on outside click (mobile)
         document.addEventListener('click', (e) => {
             if (window.innerWidth <= 768 && dom.sidebar.classList.contains('open') &&
-                !dom.sidebar.contains(e.target) && e.target !== dom.menuToggle) {
+                !dom.sidebar.contains(e.target) && !dom.menuToggle.contains(e.target)) {
                 dom.sidebar.classList.remove('open');
             }
         });
@@ -613,50 +613,6 @@ Your role is to have natural conversations in English while helping users improv
         }
     }
 
-    function speakTamilGoogle(text) {
-        // Split text into chunks of max 180 chars (Google Translate TTS has a limit of 200 chars)
-        const chunks = [];
-        const words = text.split(' ');
-        let currentChunk = '';
-        
-        for (const word of words) {
-            if ((currentChunk + ' ' + word).length > 180) {
-                chunks.push(currentChunk.trim());
-                currentChunk = word;
-            } else {
-                currentChunk = currentChunk ? currentChunk + ' ' + word : word;
-            }
-        }
-        if (currentChunk) {
-            chunks.push(currentChunk.trim());
-        }
-
-        let index = 0;
-        function playNext() {
-            if (index >= chunks.length) {
-                state.currentAudio = null;
-                return;
-            }
-            const url = `https://translate.google.com/translate_tts?ie=UTF-8&tl=ta&client=tw-ob&q=${encodeURIComponent(chunks[index])}`;
-            state.currentAudio = new Audio(url);
-            state.currentAudio.playbackRate = state.voiceRate;
-            state.currentAudio.onended = () => {
-                index++;
-                playNext();
-            };
-            state.currentAudio.onerror = (e) => {
-                console.error("Google TTS error:", e);
-                index++;
-                playNext();
-            };
-            state.currentAudio.play().catch(err => {
-                console.error("Google TTS playback blocked/failed:", err);
-                state.currentAudio = null;
-            });
-        }
-        playNext();
-    }
-
     // ---------- VOICE GENDER DETECTION ----------
     function detectVoiceGender(name) {
         const female = /samantha|victoria|karen|moira|tessa|veena|fiona|allison|ava|nova|aria|jenny|sonia|libby|mia|heera|zira|hazel|susan|zoe|alice|emma|emily|lisa|sarah|anna|linda|laura|olivia|sophia|charlotte|amelia|natasha|kate|julia|helena|freya|female|woman|girl|microsoft zira|google uk english female/i;
@@ -669,13 +625,8 @@ Your role is to have natural conversations in English while helping users improv
     function loadVoices() {
         const populateVoices = () => {
             const allVoices = state.synth.getVoices();
-            const langPrefix = state.voiceLang === 'ta' ? 'ta' : 'en';
+            const langPrefix = 'en'; // Force English voices for AI speech
             let filtered = allVoices.filter((v) => v.lang.startsWith(langPrefix));
-
-            // Fallback: if no Tamil voices found, show English voices with a note
-            if (filtered.length === 0) {
-                filtered = allVoices.filter((v) => v.lang.startsWith('en'));
-            }
 
             // Filter by gender preference
             if (state.voiceGender !== 'any') {
@@ -703,17 +654,19 @@ Your role is to have natural conversations in English while helping users improv
 
     function speak(text) {
         stopSpeech();
-        // Clean markdown for speech
-        const clean = text.replace(/\*\*/g, '').replace(/`/g, '').replace(/[❌✅💡🗣️📝🎯🔊✏️📖💯🎵👅🎧📚🔗🧩🌍🎭💼✈️🏥⚠️]/g, '').trim();
         
+        // Filter out any lines containing Tamil characters
+        const englishLines = text.split('\n')
+            .filter(line => !/[\u0B80-\u0BFF]/.test(line))
+            .join('\n');
+
+        // Clean markdown for speech
+        const clean = englishLines.replace(/\*\*/g, '').replace(/`/g, '').replace(/[❌✅💡🗣️📝🎯🔊✏️📖💯🎵👅🎧📚🔗🧩🌍🎭💼✈️🏥⚠️]/g, '').trim();
+        
+        if (!clean) return;
+
         const voiceIdx = parseInt(dom.voiceSelect.value);
         const selectedVoiceObj = state.voices[voiceIdx];
-
-        // Check if we need to fall back to Google Translate TTS for Tamil
-        if (state.voiceLang === 'ta' && (!selectedVoiceObj || !selectedVoiceObj.lang.startsWith('ta'))) {
-            speakTamilGoogle(clean);
-            return;
-        }
 
         const utt = new SpeechSynthesisUtterance(clean);
         utt.rate = state.voiceRate;
