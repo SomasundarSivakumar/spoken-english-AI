@@ -283,6 +283,7 @@ Available scenarios: job interview, restaurant ordering, hotel check-in, doctor 
         const items = features[state.mode] || features.conversation;
         dom.chatMessages.innerHTML = `
             <div class="welcome-card">
+                <img src="logo.png" alt="Queen Rat" class="welcome-logo">
                 <h2>${modeConfig[state.mode].title}</h2>
                 <p>${modeConfig[state.mode].desc}</p>
                 <div class="feature-grid">
@@ -306,7 +307,7 @@ Available scenarios: job interview, restaurant ordering, hotel check-in, doctor 
 
         const formattedText = formatMessage(text);
         msgEl.innerHTML = `
-            <div class="msg-avatar">${role === 'ai' ? 'AI' : 'U'}</div>
+            <div class="msg-avatar">${role === 'ai' ? '<img src="logo.png" alt="AI" class="avatar-img">' : 'U'}</div>
             <div class="msg-content">
                 ${formattedText}
                 ${role === 'ai' ? `
