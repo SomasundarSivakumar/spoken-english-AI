@@ -464,10 +464,36 @@ Your role is to have natural conversations in English while helping users improv
 
         // Add conversation history (last 10 messages for context)
         const recentMsgs = state.messages.slice(-10);
-        for (const msg of recentMsgs) {
+        for (let i = 0; i < recentMsgs.length; i++) {
+            const msg = recentMsgs[i];
+            let content = msg.text;
+
+            // Strip the tips/notes/feedback from previous assistant responses to avoid language bias in history
+            if (msg.role !== 'user') {
+                const index = content.search(/(💡?\s*Quick\s*tip|📝?\s*Note|📝?\s*Feedback)/i);
+                if (index !== -1) {
+                    content = content.substring(0, index).trim();
+                }
+            }
+
+            // Append a strong instruction to the last user message
+            if (i === recentMsgs.length - 1 && msg.role === 'user' && state.voiceLang === 'ta') {
+                if (state.mode === 'conversation') {
+                    content += '\n\n(Instruction: Converse in English. You MUST append "💡 Quick tip: [in Tamil (தமிழ்)]" or "📝 Note: [in Tamil (தமிழ்)]" at the end. The explanation itself must be 100% in Tamil script.)';
+                } else if (state.mode === 'grammar') {
+                    content += '\n\n(Instruction: Analyze the grammar in English, but write all explanations, descriptions, and comments 100% in Tamil (தமிழ்) script.)';
+                } else if (state.mode === 'pronunciation') {
+                    content += '\n\n(Instruction: Provide phonetic IPA guides, but write all explanations and practice instructions 100% in Tamil (தமிழ்) script.)';
+                } else if (state.mode === 'vocabulary') {
+                    content += '\n\n(Instruction: Provide the English vocabulary word and examples, but write definitions and quiz questions/options 100% in Tamil (தமிழ்) script.)';
+                } else if (state.mode === 'roleplay') {
+                    content += '\n\n(Instruction: Converse in English, but you MUST add a "📝 Feedback: [in Tamil (தமிழ்)]" section at the very end coaching the user.)';
+                }
+            }
+
             messages.push({
                 role: msg.role === 'user' ? 'user' : 'assistant',
-                content: msg.text,
+                content: content,
             });
         }
 
