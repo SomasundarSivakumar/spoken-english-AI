@@ -12,7 +12,7 @@
         voicePitch: parseFloat(localStorage.getItem('sw_voicePitch') || '1'),
         selectedVoice: localStorage.getItem('sw_voice') || '',
         voiceLang: localStorage.getItem('sw_voiceLang') || 'en',
-        voiceGender: localStorage.getItem('sw_voiceGender') || 'any',
+        voiceGender: 'female',
         isRecording: false,
         isSending: false,
         messages: [],
@@ -51,7 +51,6 @@
         autoSpeakToggle: $('#auto-speak-toggle'),
         difficultyChips: $$('.chip[data-level]'),
         langChips: $$('.chip[data-lang]'),
-        genderChips: $$('.chip[data-gender]'),
         setupOverlay: $('#setup-overlay'),
         setupApiKey: $('#setup-api-key'),
         saveKeyBtn: $('#save-key-btn'),
@@ -194,15 +193,7 @@ Available scenarios: job interview, restaurant ordering, hotel check-in, doctor 
                 loadVoices();
             });
         });
-        dom.genderChips.forEach((chip) => {
-            chip.addEventListener('click', () => {
-                dom.genderChips.forEach((c) => c.classList.remove('active'));
-                chip.classList.add('active');
-                state.voiceGender = chip.dataset.gender;
-                localStorage.setItem('sw_voiceGender', state.voiceGender);
-                loadVoices();
-            });
-        });
+
 
         // Close sidebar on outside click (mobile)
         document.addEventListener('click', (e) => {
@@ -733,7 +724,6 @@ Your role is to have natural conversations in English while helping users improv
         dom.autoSpeakToggle.checked = state.autoSpeak;
         dom.difficultyChips.forEach((c) => c.classList.toggle('active', c.dataset.level === state.difficulty));
         dom.langChips.forEach((c) => c.classList.toggle('active', c.dataset.lang === state.voiceLang));
-        dom.genderChips.forEach((c) => c.classList.toggle('active', c.dataset.gender === state.voiceGender));
         if (dom.settingsApiKey) dom.settingsApiKey.value = state.apiKey;
     }
 
