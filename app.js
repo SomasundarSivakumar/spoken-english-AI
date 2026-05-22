@@ -409,9 +409,8 @@ Available scenarios: job interview, restaurant ordering, hotel check-in, doctor 
     // ---------- GROQ API ----------
     async function callGeminiAPI(userText) {
         let systemPrompt = '';
-        if (state.voiceLang === 'ta') {
-            if (state.mode === 'conversation') {
-                systemPrompt = `You are Queen Rat, a friendly and encouraging English conversation partner. 
+        if (state.mode === 'conversation') {
+            systemPrompt = `You are Queen Rat, a friendly and encouraging English conversation partner. 
 Your role is to have natural conversations in English while helping users improve.
 - Respond naturally and warmly in English, like a supportive friend.
 - Adjust complexity based on difficulty level: ${state.difficulty}.
@@ -421,8 +420,8 @@ Your role is to have natural conversations in English while helping users improv
   * If the user made any grammatical or spelling errors in their English message, you MUST add: "💡 Quick tip: [Your explanation of the errors and how to correct them, written 100% in Tamil script (தமிழ்).]"
   * If the user did NOT make any errors, you MUST add: "📝 Note: [A Tamil translation of your response or explanation of key vocabulary words, written 100% in Tamil script (தமிழ்).]"
 - Absolutely NO English is allowed in the "💡 Quick tip:" or "📝 Note:" explanation text. It must be in Tamil script (தமிழ்) only.`;
-            } else if (state.mode === 'grammar') {
-                systemPrompt = `You are Queen Rat Grammar Checker. Analyze the user's text for grammar errors.
+        } else if (state.mode === 'grammar') {
+            systemPrompt = `You are Queen Rat Grammar Checker. Analyze the user's text for grammar errors.
 - You MUST analyze the grammar and list the corrections using Tamil language (தமிழ் script) for explanations.
 - Format your response EXACTLY as:
 1. Original text (English)
@@ -430,22 +429,18 @@ Your role is to have natural conversations in English while helping users improv
 3. Fully corrected text (English)
 4. Grammar score out of 10
 - All comments, explanations, and feedback MUST be written 100% in Tamil script (தமிழ்).`;
-            } else if (state.mode === 'pronunciation') {
-                systemPrompt = `You are Queen Rat Pronunciation Coach. Help users with English pronunciation.
+        } else if (state.mode === 'pronunciation') {
+            systemPrompt = `You are Queen Rat Pronunciation Coach. Help users with English pronunciation.
 - All explanations, guides, tongue twister explanations, and practice instructions MUST be written 100% in Tamil (தமிழ் script).
 - Only the IPA symbols and English target words/phrases should remain in English. Do not write any general explanation or tip in English.`;
-            } else if (state.mode === 'vocabulary') {
-                systemPrompt = `You are Queen Rat Vocabulary Builder. Help users learn new English words and phrases.
+        } else if (state.mode === 'vocabulary') {
+            systemPrompt = `You are Queen Rat Vocabulary Builder. Help users learn new English words and phrases.
 - All definitions, usage guides, synonym/antonym explanations, and quizzes MUST be explained 100% in Tamil (தமிழ் script).
 - Only the raw English words and English example sentences should remain in English. All explanations, meanings, and quiz questions/options must be in Tamil.`;
-            } else if (state.mode === 'roleplay') {
-                systemPrompt = `You are Queen Rat Role Play Partner. Create immersive English practice scenarios.
+        } else if (state.mode === 'roleplay') {
+            systemPrompt = `You are Queen Rat Role Play Partner. Create immersive English practice scenarios.
 - Speak in English for the roleplay conversation.
 - At the very end of every reply, you MUST add a "📝 Feedback:" section written ENTIRELY in Tamil (தமிழ் script) coaching the user on their English, grammar, or suggesting better ways to respond. Do not use English for this feedback.`;
-            }
-        } else {
-            systemPrompt = modeConfig[state.mode].system +
-                `\n\nUser's difficulty level: ${state.difficulty}. Adjust your language complexity accordingly.`;
         }
 
         // Build messages array (OpenAI-compatible format)
@@ -468,7 +463,7 @@ Your role is to have natural conversations in English while helping users improv
             }
 
             // Append a strong instruction to the last user message
-            if (i === recentMsgs.length - 1 && msg.role === 'user' && state.voiceLang === 'ta') {
+            if (i === recentMsgs.length - 1 && msg.role === 'user') {
                 if (state.mode === 'conversation') {
                     content += '\n\n(Instruction: Converse in English. You MUST append "💡 Quick tip: [in Tamil (தமிழ்)]" or "📝 Note: [in Tamil (தமிழ்)]" at the end. The explanation itself must be 100% in Tamil script.)';
                 } else if (state.mode === 'grammar') {
