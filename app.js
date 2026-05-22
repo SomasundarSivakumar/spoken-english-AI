@@ -420,15 +420,31 @@ Available scenarios: job interview, restaurant ordering, hotel check-in, doctor 
         let tamilInstructions = '';
         if (state.voiceLang === 'ta') {
             if (state.mode === 'conversation') {
-                tamilInstructions = '\n\nIMPORTANT: Have the conversation in English. However, if you provide any grammar tips or corrections under the "💡 Quick tip:" header, you MUST write the explanations and tips in Tamil (தமிழ் script) so the user can easily understand their mistakes.';
+                tamilInstructions = `\n\nIMPORTANT TAMIL MODE RULE:
+- You MUST converse in English so the user can practice.
+- You MUST ALWAYS add a section at the very end of your response in Tamil (தமிழ் script).
+- If the user made any grammatical errors in their message, add a "💡 Quick tip:" section in Tamil explaining the corrections (e.g., "💡 Quick tip: [Tamil explanation of errors and corrections]").
+- If the user did NOT make any errors, you MUST still add a "📝 Note:" section in Tamil translating your reply or explaining key words (e.g., "📝 Note: [Tamil translation of your response or explanation of key words]").
+- Every response must end with either "💡 Quick tip:" or "📝 Note:" written in Tamil script.`;
             } else if (state.mode === 'grammar') {
-                tamilInstructions = '\n\nIMPORTANT: Keep the original and corrected English sentences in English. However, write the error descriptions, grammar explanations, and lessons in Tamil (தமிழ் script).';
+                tamilInstructions = `\n\nIMPORTANT TAMIL MODE RULE:
+- You MUST analyze the grammar and list the corrections in Tamil (தமிழ் script).
+- Format:
+1. Original text (English)
+2. List of errors: ❌ [Error] → ✅ [Correction] - [Explain why in Tamil (தமிழ்)]
+3. Fully corrected text (English)
+4. Grammar score out of 10
+- All explanations and comments must be in Tamil script.`;
             } else if (state.mode === 'pronunciation') {
-                tamilInstructions = '\n\nIMPORTANT: Explain the pronunciation tips, mouth positions, common mistakes, and guidance in Tamil (தமிழ் script). Keep the target English words and phonetic symbols (IPA) in English.';
+                tamilInstructions = `\n\nIMPORTANT TAMIL MODE RULE:
+- All explanations, guides, tongue twister explanations, and practice instructions MUST be in Tamil (தமிழ் script). Only the IPA symbols and English words should be in English.`;
             } else if (state.mode === 'vocabulary') {
-                tamilInstructions = '\n\nIMPORTANT: Provide the definitions, usage guides, synonyms/antonyms explanations, and quizzes in Tamil (தமிழ் script). Keep the English words and example sentences in English.';
+                tamilInstructions = `\n\nIMPORTANT TAMIL MODE RULE:
+- All definitions, usage guides, synonym/antonym explanations, and quizzes MUST be explained in Tamil (தமிழ் script). Only the raw English words and English example sentences should remain in English.`;
             } else if (state.mode === 'roleplay') {
-                tamilInstructions = '\n\nIMPORTANT: Chat in English to maintain the role-play. However, provide any grammar/pronunciation feedback, corrections, or improvement tips in Tamil (தமிழ் script) at the end of your response.';
+                tamilInstructions = `\n\nIMPORTANT TAMIL MODE RULE:
+- Speak in English for the roleplay conversation.
+- At the very end of every reply, you MUST add a "📝 Feedback:" section written entirely in Tamil (தமிழ் script) coaching the user on their English, grammar, or suggesting better ways to respond.`;
             }
         }
 
