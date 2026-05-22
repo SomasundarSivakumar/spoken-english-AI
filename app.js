@@ -417,9 +417,24 @@ Available scenarios: job interview, restaurant ordering, hotel check-in, doctor 
 
     // ---------- GROQ API ----------
     async function callGeminiAPI(userText) {
+        let tamilInstructions = '';
+        if (state.voiceLang === 'ta') {
+            if (state.mode === 'conversation') {
+                tamilInstructions = '\n\nIMPORTANT: Have the conversation in English. However, if you provide any grammar tips or corrections under the "💡 Quick tip:" header, you MUST write the explanations and tips in Tamil (தமிழ் script) so the user can easily understand their mistakes.';
+            } else if (state.mode === 'grammar') {
+                tamilInstructions = '\n\nIMPORTANT: Keep the original and corrected English sentences in English. However, write the error descriptions, grammar explanations, and lessons in Tamil (தமிழ் script).';
+            } else if (state.mode === 'pronunciation') {
+                tamilInstructions = '\n\nIMPORTANT: Explain the pronunciation tips, mouth positions, common mistakes, and guidance in Tamil (தமிழ் script). Keep the target English words and phonetic symbols (IPA) in English.';
+            } else if (state.mode === 'vocabulary') {
+                tamilInstructions = '\n\nIMPORTANT: Provide the definitions, usage guides, synonyms/antonyms explanations, and quizzes in Tamil (தமிழ் script). Keep the English words and example sentences in English.';
+            } else if (state.mode === 'roleplay') {
+                tamilInstructions = '\n\nIMPORTANT: Chat in English to maintain the role-play. However, provide any grammar/pronunciation feedback, corrections, or improvement tips in Tamil (தமிழ் script) at the end of your response.';
+            }
+        }
+
         const systemPrompt = modeConfig[state.mode].system +
             `\n\nUser's difficulty level: ${state.difficulty}. Adjust your language complexity accordingly.` +
-            (state.voiceLang === 'ta' ? '\n\nIMPORTANT: Always respond in Tamil language (தமிழ்). Use Tamil script for all your replies.' : '');
+            tamilInstructions;
 
         // Build messages array (OpenAI-compatible format)
         const messages = [
