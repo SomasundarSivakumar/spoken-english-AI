@@ -1,217 +1,474 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="ta, en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Queen Rat AI — Your Intelligent English Speaking Partner</title>
-    <meta name="description" content="Practice spoken English with an AI-powered conversation partner. Get real-time grammar corrections, pronunciation tips, and fluency coaching.">
-    <meta name="keywords" content="spoken english, AI tutor, english speaking practice, grammar correction, pronunciation">
-    <meta name="theme-color" content="#0a0a1a">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Queen Rat AI — Spoken English with Tamil Voice Assistant</title>
+    <meta name="description" content="Learn spoken English naturally through Tamil explanations. Daily tenses, vocabulary practice with Tamil meaning, and AI voice tutor. 100% Free AI.">
+    <meta name="theme-color" content="#070913">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
     <link rel="icon" type="image/png" href="logo.png">
     <link rel="apple-touch-icon" href="logo.png">
+    <!-- Optional Free AI client SDK -->
+    <script src="https://js.puter.com/v2/" defer></script>
 </head>
 <body>
 
-    <!-- ===== SETUP OVERLAY ===== -->
-    <div id="setup-overlay" class="setup-overlay hidden">
-        <div class="setup-card">
-            <div class="setup-icon">
-                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="url(#setup-grad)" stroke-width="2">
-                    <defs>
-                        <linearGradient id="setup-grad" x1="0" y1="0" x2="1" y2="1">
-                            <stop offset="0%" stop-color="#6366f1"/>
-                            <stop offset="100%" stop-color="#a855f7"/>
-                        </linearGradient>
-                    </defs>
-                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
-                    <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
-                </svg>
-            </div>
-            <h2 class="setup-title gradient-text">Queen Rat AI</h2>
-            <p class="setup-subtitle">Your Intelligent English Speaking Partner</p>
-            <div class="setup-form">
-                <div class="input-group">
-                    <label for="setup-api-key">Groq API Key</label>
-                    <div class="input-wrapper">
-                        <input type="password" id="setup-api-key" placeholder="Enter your gsk_... key">
-                    </div>
-                </div>
-                <button id="save-key-btn" class="btn-primary" disabled>
-                    Get Started
-                </button>
-                <a href="https://console.groq.com/keys" target="_blank" class="get-key-link">
-                    Get a free API key from Groq Console ↗
-                </a>
-            </div>
-        </div>
-    </div>
-
-    <!-- ===== MAIN APPLICATION ===== -->
-    <div id="app" class="app">
+    <!-- ===== MAIN APP SHELL ===== -->
+    <div id="app" class="app-layout">
         
-        <!-- SIDEBAR -->
+        <!-- SIDEBAR (Desktop / Tablet) -->
         <aside id="sidebar" class="sidebar">
             <div class="sidebar-header">
                 <div class="logo">
-                    <img src="logo.png" alt="Queen Rat Logo" class="logo-img">
-                    <span class="logo-text">Queen Rat</span>
+                    <img src="logo.png" alt="Queen Rat AI Logo" class="logo-img">
+                    <div class="logo-text">
+                        <span class="logo-brand">Queen Rat <span class="logo-highlight">AI</span></span>
+                        <span class="logo-sub">தமிழ் Spoken English</span>
+                    </div>
                 </div>
             </div>
 
+            <!-- Free Badge -->
+            <div class="ai-status-badge">
+                <span class="status-dot"></span>
+                <span id="sidebar-provider-label">Free AI Active · No Key Needed</span>
+            </div>
+
+            <!-- Navigation -->
             <nav class="sidebar-nav">
-                <button class="nav-item active" data-mode="conversation" id="nav-conversation">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-                    <span>Conversation</span>
+                <button class="nav-item active" data-tab="chat">
+                    <span class="nav-icon">💬</span>
+                    <span class="nav-label">Voice & Chat <small>உரையாடல்</small></span>
                 </button>
-                <button class="nav-item" data-mode="grammar" id="nav-grammar">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-                    <span>Grammar Check</span>
+                <button class="nav-item" data-tab="tenses">
+                    <span class="nav-icon">⏳</span>
+                    <span class="nav-label">Daily Tenses <small>12 காலங்கள்</small></span>
+                    <span class="badge-mini">Daily</span>
                 </button>
-                <button class="nav-item" data-mode="pronunciation" id="nav-pronunciation">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>
-                    <span>Pronunciation</span>
+                <button class="nav-item" data-tab="words">
+                    <span class="nav-icon">📖</span>
+                    <span class="nav-label">Daily Words <small>தமிழ் அர்த்தம்</small></span>
+                    <span class="badge-mini">New</span>
                 </button>
-                <button class="nav-item" data-mode="vocabulary" id="nav-vocabulary">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
-                    <span>Vocabulary</span>
+                <button class="nav-item" data-tab="roleplay">
+                    <span class="nav-icon">🎭</span>
+                    <span class="nav-label">Roleplay Drills <small>சூழல் பயிற்சி</small></span>
                 </button>
-                <button class="nav-item" data-mode="roleplay" id="nav-roleplay">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-                    <span>Role Play</span>
+                <button class="nav-item" data-tab="settings">
+                    <span class="nav-icon">⚙️</span>
+                    <span class="nav-label">Settings <small>அமைப்புகள்</small></span>
                 </button>
             </nav>
 
+            <!-- Quick Proverb / Tip Card in Sidebar -->
+            <div class="sidebar-tip-card">
+                <div class="tip-header">💡 Daily English Tip</div>
+                <p id="sidebar-daily-tip">"Practice 5 minutes every day. Consistency beats perfection!"</p>
+                <span class="tip-tamil">தினமும் 5 நிமிடம் பேசுங்கள்!</span>
+            </div>
+
             <div class="sidebar-footer">
-                <button id="voice-settings-btn" class="nav-item" title="Voice Settings">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-                    <span>Settings</span>
+                <button id="clear-chat-btn" class="sidebar-action-btn" title="Clear Conversation">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-2 14a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2L5 6m5 0V4a2 2 0 0 1 2-2h0a2 2 0 0 1 2 2v2"/></svg>
+                    Clear Chat
                 </button>
             </div>
         </aside>
 
-        <!-- MAIN CONTENT -->
-        <main class="main-content">
+        <!-- MAIN CONTAINER -->
+        <div class="main-content">
             
             <!-- TOP BAR -->
             <header class="top-bar">
-                <button id="menu-toggle" class="icon-btn" title="Toggle Menu">
-                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
-                </button>
-                <div class="mode-title">
-                    <h1 id="current-mode-title">AI Conversation</h1>
-                    <span id="current-mode-desc" class="mode-desc">Practice natural English conversation with your AI partner</span>
+                <div class="top-bar-left">
+                    <button id="menu-toggle" class="icon-btn mobile-menu-btn" aria-label="Toggle menu">
+                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+                    </button>
+                    <div class="mobile-logo-header">
+                        <img src="logo.png" alt="Queen Rat" class="mobile-logo-img">
+                        <div class="title-wrap">
+                            <h1 id="page-title">Queen Rat AI</h1>
+                            <span id="page-subtitle" class="page-subtitle">Spoken English Tutor with Tamil Voice</span>
+                        </div>
+                    </div>
                 </div>
-                <div class="top-bar-actions">
-                    <button id="clear-chat-btn" class="icon-btn" title="Clear Chat">
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+
+                <div class="top-bar-right">
+                    <!-- Quick Mode Pill in Chat -->
+                    <div class="mode-selector-pill" id="chat-mode-pill">
+                        <button class="mode-chip active" data-mode="conversation" title="Natural Conversation">🗣️ Chat</button>
+                        <button class="mode-chip" data-mode="grammar" title="Grammar Correction">✏️ Grammar</button>
+                        <button class="mode-chip" data-mode="pronunciation" title="Pronunciation & Phonetics">👅 Accent</button>
+                    </div>
+
+                    <!-- Theme Toggle (Light / Dark) -->
+                    <button id="theme-toggle-btn" class="icon-btn" title="Toggle Light / Dark Theme">
+                        <span id="theme-icon">☀️</span>
+                    </button>
+
+                    <!-- Voice Audio Toggle -->
+                    <button id="voice-quick-toggle" class="icon-btn active" title="Toggle Auto-Voice">
+                        <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>
+                    </button>
+
+                    <!-- Settings Button -->
+                    <button id="settings-quick-btn" class="icon-btn" title="Open Settings">
+                        <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
                     </button>
                 </div>
             </header>
 
-            <!-- CHAT AREA -->
-            <div id="chat-area" class="chat-area">
-                <div id="chat-messages" class="chat-messages">
-                    <!-- Welcome message will be inserted by JS -->
+            <!-- TAB 1: CHAT & VOICE ASSISTANT -->
+            <section id="tab-chat" class="tab-pane active">
+                <div id="chat-area" class="chat-area">
+                    <div id="chat-messages" class="chat-messages">
+                        <!-- Populated by JS -->
+                    </div>
                 </div>
-            </div>
 
-            <!-- INPUT AREA -->
-            <div class="input-area">
-                <div class="input-container">
-                    <div class="text-input-wrapper">
-                        <textarea id="text-input" placeholder="Type your message or click the mic to speak..." rows="1"></textarea>
-                        <button id="send-btn" class="send-btn" title="Send Message" disabled>
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+                <!-- Input Zone -->
+                <div class="input-area">
+                    <!-- Quick Prompt Suggestions Bar -->
+                    <div class="quick-prompts-bar">
+                        <button class="quick-chip" data-prompt="Teach me how to introduce myself in an interview with Tamil meaning">💼 Self Intro</button>
+                        <button class="quick-chip" data-prompt="How do I ask for directions politely in English? Explain in Tamil">🗺️ Directions</button>
+                        <button class="quick-chip" data-prompt="Teach me 3 useful English idioms used in daily life with Tamil meaning">💡 Daily Idioms</button>
+                        <button class="quick-chip" data-prompt="I will say a sentence in English. Please check my grammar and explain mistakes in Tamil">✍️ Check Grammar</button>
+                    </div>
+
+                    <!-- Live Typing Meaning Bar (Shows Tamil meaning instantly as you type!) -->
+                    <div id="typing-meaning-bar" class="typing-meaning-bar hidden">
+                        <span class="tmb-label">📖 Meaning:</span>
+                        <span class="tmb-word" id="tmb-word"></span>
+                        <span class="tmb-tamil" id="tmb-tamil"></span>
+                        <span class="tmb-sound" id="tmb-sound"></span>
+                        <button id="tmb-speak-btn" class="tmb-speak" title="Listen Pronunciation">🔊</button>
+                    </div>
+
+                    <div class="input-container">
+                        <button id="mic-btn" class="mic-btn" title="Speak (English / தமிழ்)" aria-label="Microphone">
+                            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+                        </button>
+                        <div class="input-box-wrapper">
+                            <textarea id="text-input" placeholder="Type or click mic to speak... (ஆங்கிலம் அல்லது தமிழில் கேளுங்கள்)" rows="1"></textarea>
+                            <span id="recording-indicator" class="recording-indicator hidden">
+                                <span class="rec-dot"></span> Listening...
+                            </span>
+                        </div>
+                        <button id="send-btn" class="send-btn" disabled title="Send message" aria-label="Send">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
                         </button>
                     </div>
-                    <button id="mic-btn" class="mic-btn" title="Hold to speak">
-                        <div class="mic-pulse"></div>
-                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/>
-                            <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
-                            <line x1="12" y1="19" x2="12" y2="22"/>
-                        </svg>
-                    </button>
                 </div>
-                <div class="input-hints">
-                    <span id="recording-status" class="recording-status hidden">
-                        <span class="rec-dot"></span> Listening...
-                    </span>
-                    <span class="hint-text">Press <kbd>Enter</kbd> to send · <kbd>Shift+Enter</kbd> for new line</span>
-                </div>
-            </div>
-        </main>
-    </div>
+            </section>
 
-    <!-- ===== SETTINGS MODAL ===== -->
-    <div id="settings-modal" class="modal-overlay hidden">
-        <div class="modal-card">
-            <div class="modal-header">
-                <h2>Voice & AI Settings</h2>
-                <button id="close-settings" class="icon-btn">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-                </button>
-            </div>
-            <div class="modal-body">
-                <div class="settings-section">
-                    <h3>Voice Output</h3>
-                    <div class="setting-row">
-                        <label for="voice-select">AI Voice</label>
-                        <select id="voice-select"></select>
+            <!-- TAB 2: DAILY TENSES MASTERY -->
+            <section id="tab-tenses" class="tab-pane">
+                <div class="section-container">
+                    <div class="section-hero">
+                        <div class="hero-badge">⏳ Complete Grammar Guide</div>
+                        <h2>12 English Tenses with Tamil Explanation</h2>
+                        <p>காலங்களை தமிழில் எளிதாகப் புரிந்து கொண்டு சரியாகப் பேசுங்கள் (Formulas, Tamil rules, Real examples & Audio drills)</p>
                     </div>
-                    <div class="setting-row">
-                        <label for="speed-range">Speed</label>
-                        <div class="range-wrapper">
-                            <input type="range" id="speed-range" min="0.5" max="2" step="0.1" value="1">
-                            <span id="speed-value">1.0x</span>
+
+                    <!-- Tenses Filter -->
+                    <div class="tenses-filters">
+                        <button class="filter-btn active" data-filter="all">All Tenses (12)</button>
+                        <button class="filter-btn" data-filter="present">🌱 Present (நிகழ்காலம்)</button>
+                        <button class="filter-btn" data-filter="past">⏪ Past (இறந்தகாலம்)</button>
+                        <button class="filter-btn" data-filter="future">⏩ Future (எதிர்காலம்)</button>
+                    </div>
+
+                    <!-- Interactive Practice Quiz Banner -->
+                    <div class="tenses-quiz-banner">
+                        <div class="quiz-banner-text">
+                            <h3>🎯 Daily Tense Challenge (தினசரி தேர்வு)</h3>
+                            <p id="tense-quiz-question">Loading today's practice question...</p>
+                            <div id="tense-quiz-options" class="quiz-options-grid"></div>
+                            <div id="tense-quiz-feedback" class="quiz-feedback-box hidden"></div>
+                        </div>
+                        <button id="next-tense-quiz-btn" class="btn-secondary-sm">Next Question ↻</button>
+                    </div>
+
+                    <!-- Tenses Cards Grid -->
+                    <div id="tenses-grid" class="tenses-grid">
+                        <!-- Populated by JS -->
+                    </div>
+                </div>
+            </section>
+
+            <!-- TAB 3: DAILY WORDS PRACTICE -->
+            <section id="tab-words" class="tab-pane">
+                <div class="section-container">
+                    <div class="section-hero">
+                        <div class="hero-badge">📖 Daily Spoken Vocabulary</div>
+                        <h2>English Words with Tamil Meaning & Voice</h2>
+                        <p>தினமும் புதிய வார்த்தைகள், தமிழ் அர்த்தம், உச்சரிப்பு மற்றும் வாக்கியப் பயிற்சி</p>
+                    </div>
+
+                    <!-- Instant Word Lookup Search Box -->
+                    <div class="word-lookup-card">
+                        <div class="lookup-header">
+                            <span class="lookup-icon">🔍</span>
+                            <div>
+                                <h3>Instant Word Meaning Lookup (உடனடி தமிழ் அர்த்தம்)</h3>
+                                <p>Type any English word to see its Tamil meaning, pronunciation & sentence</p>
+                            </div>
+                        </div>
+                        <div class="lookup-input-wrapper">
+                            <input type="text" id="word-search-input" placeholder="Type an English word... (எ.கா: crucial, hesitate, explore, grateful)" autocomplete="off">
+                            <button id="word-clear-btn" class="btn-clear hidden" title="Clear">✕</button>
+                            <button id="word-search-btn" class="btn-lookup">Get Tamil Meaning</button>
+                        </div>
+                        <!-- Live Result Container -->
+                        <div id="word-lookup-result" class="lookup-result-box hidden"></div>
+                    </div>
+
+                    <!-- Word of the Day Showcase -->
+                    <div id="word-of-day-card" class="word-showcase-card">
+                        <!-- Populated by JS -->
+                    </div>
+
+                    <!-- Category Pills -->
+                    <div class="vocab-categories">
+                        <button class="vocab-cat-btn active" data-cat="all">🌟 All Categories</button>
+                        <button class="vocab-cat-btn" data-cat="daily">💬 Daily Life (தினசரி)</button>
+                        <button class="vocab-cat-btn" data-cat="office">💼 Office & Career (வேலை)</button>
+                        <button class="vocab-cat-btn" data-cat="feelings">❤️ Emotions (உணர்வுகள்)</button>
+                        <button class="vocab-cat-btn" data-cat="travel">✈️ Travel & Shopping (பயணம்)</button>
+                    </div>
+
+                    <!-- Vocab Quiz Mini-Module -->
+                    <div class="vocab-quiz-container">
+                        <div class="quiz-header-row">
+                            <span class="quiz-title">⚡ Word Quiz: What is the Tamil meaning?</span>
+                            <span id="vocab-score-badge" class="score-pill">Score: 0</span>
+                        </div>
+                        <div id="vocab-quiz-card" class="vocab-quiz-card">
+                            <!-- Populated by JS -->
                         </div>
                     </div>
-                    <div class="setting-row">
-                        <label for="pitch-range">Pitch</label>
-                        <div class="range-wrapper">
-                            <input type="range" id="pitch-range" min="0" max="2" step="0.1" value="1">
-                            <span id="pitch-value">1.0</span>
+
+                    <!-- Words Cards Grid -->
+                    <div id="words-grid" class="words-grid">
+                        <!-- Populated by JS -->
+                    </div>
+                </div>
+            </section>
+
+            <!-- TAB 4: ROLEPLAY DRILLS -->
+            <section id="tab-roleplay" class="tab-pane">
+                <div class="section-container">
+                    <div class="section-hero">
+                        <div class="hero-badge">🎭 Real World Practice</div>
+                        <h2>Interactive English Scenarios</h2>
+                        <p>தேர்ந்தெடுக்கும் சூழ்நிலைகளில் ஆங்கிலத்தில் பேசிப் பழகுங்கள். தவறுகளைத் திருத்தி தமிழ் விளக்கம் தரும்!</p>
+                    </div>
+
+                    <div class="roleplay-cards-grid">
+                        <div class="roleplay-card" data-scenario="job-interview">
+                            <div class="rp-icon">💼</div>
+                            <h3>Job Interview</h3>
+                            <p class="rp-tamil">வேலை நேர்முகத் தேர்வு</p>
+                            <p class="rp-desc">Practice answering common interview questions with confidence and professional vocabulary.</p>
+                            <button class="btn-start-rp">Start Practice ↗</button>
+                        </div>
+
+                        <div class="roleplay-card" data-scenario="restaurant">
+                            <div class="rp-icon">🍽️</div>
+                            <h3>Restaurant & Food</h3>
+                            <p class="rp-tamil">ஹோட்டல் ஆர்டர் செய்தல்</p>
+                            <p class="rp-desc">Practice booking a table, ordering meals, asking for recommendations, and paying the bill.</p>
+                            <button class="btn-start-rp">Start Practice ↗</button>
+                        </div>
+
+                        <div class="roleplay-card" data-scenario="travel">
+                            <div class="rp-icon">✈️</div>
+                            <h3>Airport & Travel</h3>
+                            <p class="rp-tamil">விமான நிலையம் & பயணம்</p>
+                            <p class="rp-desc">Checking in luggage, boarding gate queries, taxi bookings, and hotel room conversations.</p>
+                            <button class="btn-start-rp">Start Practice ↗</button>
+                        </div>
+
+                        <div class="roleplay-card" data-scenario="doctor">
+                            <div class="rp-icon">🏥</div>
+                            <h3>Doctor Consultation</h3>
+                            <p class="rp-tamil">மருத்துவரிடம் பேசுதல்</p>
+                            <p class="rp-desc">Explaining health symptoms, body pain, prescription medicine questions, and booking appointments.</p>
+                            <button class="btn-start-rp">Start Practice ↗</button>
+                        </div>
+
+                        <div class="roleplay-card" data-scenario="shopping">
+                            <div class="rp-icon">🛍️</div>
+                            <h3>Shopping & Bargaining</h3>
+                            <p class="rp-tamil">ஷாப்பிங் & விலை விவாதம்</p>
+                            <p class="rp-desc">Asking for sizes, discounts, return policy, and product features in stores.</p>
+                            <button class="btn-start-rp">Start Practice ↗</button>
+                        </div>
+
+                        <div class="roleplay-card" data-scenario="casual-chat">
+                            <div class="rp-icon">☕</div>
+                            <h3>Making New Friends</h3>
+                            <p class="rp-tamil">புதிய நண்பர்களுடன் பேசுதல்</p>
+                            <p class="rp-desc">Friendly casual small talk, discussing hobbies, movies, weather, and weekend plans.</p>
+                            <button class="btn-start-rp">Start Practice ↗</button>
                         </div>
                     </div>
-                    <div class="setting-row">
-                        <label>Auto-Speak Replies</label>
-                        <label class="toggle-switch">
-                            <input type="checkbox" id="auto-speak-toggle" checked>
-                            <span class="toggle-slider"></span>
-                        </label>
-                    </div>
                 </div>
-                <div class="settings-section">
-                    <h3>AI Difficulty</h3>
-                    <div class="difficulty-chips">
-                        <button class="chip active" data-level="beginner">🌱 Beginner</button>
-                        <button class="chip" data-level="intermediate">📚 Intermediate</button>
-                        <button class="chip" data-level="advanced">🚀 Advanced</button>
-                    </div>
-                </div>
-                <div class="settings-section">
-                    <h3>🌐 AI Language</h3>
-                    <div class="difficulty-chips">
-                        <button class="chip active" data-lang="en">🇬🇧 English</button>
-                        <button class="chip" data-lang="ta">🇮🇳 Tamil</button>
-                    </div>
-                    <p style="font-size:0.75rem;color:var(--text-muted);margin-top:0.5rem;">AI will respond in the selected language</p>
-                </div>
+            </section>
 
-                <div class="settings-section">
-                    <h3>🔑 API Key</h3>
-                    <div class="setting-row">
-                        <label for="settings-api-key">Groq API Key</label>
-                        <input type="password" id="settings-api-key" class="settings-input" placeholder="gsk_...">
+            <!-- TAB 5: SETTINGS -->
+            <section id="tab-settings" class="tab-pane">
+                <div class="section-container settings-max-w">
+                    <div class="section-hero">
+                        <div class="hero-badge">⚙️ Preferences</div>
+                        <h2>Voice & AI Settings</h2>
+                        <p>உங்கள் கற்றல் விருப்பங்களை அமைத்துக் கொள்ளுங்கள்</p>
                     </div>
-                    <p style="font-size:0.75rem;color:var(--text-muted);margin-top:0.5rem;">Your key is stored locally on this device.</p>
+
+                    <div class="settings-card-group">
+                        
+                        <!-- AI Engine Selection -->
+                        <div class="settings-box">
+                            <div class="setting-title-row">
+                                <h3>🤖 AI Engine (செயற்கை நுண்ணறிவு)</h3>
+                                <span class="pill-badge pill-free">100% Free Available</span>
+                            </div>
+                            
+                            <div class="setting-item">
+                                <label for="ai-provider-select">Selected AI Engine</label>
+                                <select id="ai-provider-select" class="styled-select">
+                                    <option value="pollinations" selected>Free AI (Pollinations - Zero setup, No key needed)</option>
+                                    <option value="puter">Free AI (Puter.js - Cloud Model)</option>
+                                    <option value="offline">Smart Offline Tutor (Instant & Offline)</option>
+                                    <option value="groq">Groq Cloud (Use your own Groq Key)</option>
+                                </select>
+                            </div>
+
+                            <!-- Optional Groq Key input (hidden if free AI) -->
+                            <div id="groq-key-container" class="setting-item hidden">
+                                <label for="groq-api-key">Your Groq API Key (Optional)</label>
+                                <input type="password" id="groq-api-key" class="styled-input" placeholder="gsk_...">
+                                <small class="setting-hint">Optional: Only required if you choose Groq Cloud above.</small>
+                            </div>
+                        </div>
+
+                        <!-- Voice Output Settings -->
+                        <div class="settings-box">
+                            <h3>🗣️ Spoken English & Tamil Voice</h3>
+                            
+                            <div class="setting-item">
+                                <label for="voice-select">English Voice</label>
+                                <select id="voice-select" class="styled-select"></select>
+                            </div>
+
+                            <div class="setting-item">
+                                <div class="slider-header">
+                                    <label for="speed-slider">Voice Speed (பேசும் வேகம்)</label>
+                                    <span id="speed-val">1.0x</span>
+                                </div>
+                                <input type="range" id="speed-slider" min="0.5" max="1.5" step="0.1" value="1.0" class="styled-range">
+                            </div>
+
+                            <div class="setting-item">
+                                <div class="slider-header">
+                                    <label for="pitch-slider">Voice Pitch (சுருதி)</label>
+                                    <span id="pitch-val">1.0</span>
+                                </div>
+                                <input type="range" id="pitch-slider" min="0.5" max="1.5" step="0.1" value="1.0" class="styled-range">
+                            </div>
+
+                            <div class="setting-item flex-between">
+                                <div>
+                                    <label>Auto-Play Audio on Replies</label>
+                                    <div class="setting-subtext">AI பதில் வந்ததும் தானாக வாசிக்கவும்</div>
+                                </div>
+                                <label class="switch">
+                                    <input type="checkbox" id="auto-speak-cb" checked>
+                                    <span class="slider round"></span>
+                                </label>
+                            </div>
+                        </div>
+
+                        <!-- Learning Level -->
+                        <div class="settings-box">
+                            <h3>🌱 Learning Difficulty (கற்றல் நிலை)</h3>
+                            <div class="difficulty-options">
+                                <button class="diff-btn active" data-diff="beginner">
+                                    <span class="diff-icon">🌱</span>
+                                    <span class="diff-name">Beginner</span>
+                                    <span class="diff-sub">எளிய ஆங்கிலம் + முழு தமிழ் விளக்கம்</span>
+                                </button>
+                                <button class="diff-btn" data-diff="intermediate">
+                                    <span class="diff-icon">📚</span>
+                                    <span class="diff-name">Intermediate</span>
+                                    <span class="diff-sub">இயல்பான உரையாடல் + இலக்கண உதவி</span>
+                                </button>
+                                <button class="diff-btn" data-diff="advanced">
+                                    <span class="diff-icon">🚀</span>
+                                    <span class="diff-name">Advanced</span>
+                                    <span class="diff-sub">வேகமான பேச்சு + நுட்பமான திருத்தங்கள்</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Theme Appearance -->
+                        <div class="settings-box">
+                            <h3>🎨 Theme Appearance (வடிவமைப்பு)</h3>
+                            <div class="difficulty-options">
+                                <button class="diff-btn active" data-theme-choice="light">
+                                    <span class="diff-icon">☀️</span>
+                                    <span class="diff-name">Light Theme</span>
+                                    <span class="diff-sub">Clean, bright & easy to read (பகல் முறை)</span>
+                                </button>
+                                <button class="diff-btn" data-theme-choice="dark">
+                                    <span class="diff-icon">🌙</span>
+                                    <span class="diff-name">Dark Theme</span>
+                                    <span class="diff-sub">Deep dark obsidian (இரவு முறை)</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Reset / Info -->
+                        <div class="settings-box">
+                            <h3>ℹ️ App Information</h3>
+                            <p class="about-text">Queen Rat AI is designed to help Tamil speakers master Spoken English naturally without fear or expensive classes. Powered by Free AI and Web Speech APIs.</p>
+                            <button id="reset-defaults-btn" class="btn-danger-outline">Reset App Settings</button>
+                        </div>
+                    </div>
                 </div>
-            </div>
+            </section>
         </div>
+
+        <!-- MOBILE BOTTOM NAVIGATION (Native-app feel) -->
+        <nav class="mobile-bottom-nav">
+            <button class="mobile-nav-btn active" data-tab="chat">
+                <span class="btn-icon">💬</span>
+                <span class="btn-text">Chat</span>
+            </button>
+            <button class="mobile-nav-btn" data-tab="tenses">
+                <span class="btn-icon">⏳</span>
+                <span class="btn-text">Tenses</span>
+            </button>
+            <button class="mobile-nav-btn" data-tab="words">
+                <span class="btn-icon">📖</span>
+                <span class="btn-text">Words</span>
+            </button>
+            <button class="mobile-nav-btn" data-tab="roleplay">
+                <span class="btn-icon">🎭</span>
+                <span class="btn-text">Roleplay</span>
+            </button>
+            <button class="mobile-nav-btn" data-tab="settings">
+                <span class="btn-icon">⚙️</span>
+                <span class="btn-text">Settings</span>
+            </button>
+        </nav>
     </div>
 
     <script src="app.js"></script>
