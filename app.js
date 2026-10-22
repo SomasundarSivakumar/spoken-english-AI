@@ -700,6 +700,7 @@
     const dom = {
         app: $('#app'),
         sidebar: $('#sidebar'),
+        sidebarOverlay: $('#sidebar-overlay'),
         menuToggle: $('#menu-toggle'),
         navItems: $$('.nav-item[data-tab]'),
         mobileNavBtns: $$('.mobile-nav-btn[data-tab]'),
@@ -1941,6 +1942,7 @@ Respond ONLY in this valid JSON format:
 
             // Close mobile sidebar if open
             dom.sidebar.classList.remove('open');
+            if (dom.sidebarOverlay) dom.sidebarOverlay.classList.remove('open');
         }
     };
 
@@ -1952,15 +1954,26 @@ Respond ONLY in this valid JSON format:
         dom.navItems.forEach(n => n.addEventListener('click', () => tabManager.switchTab(n.dataset.tab)));
         dom.mobileNavBtns.forEach(b => b.addEventListener('click', () => tabManager.switchTab(b.dataset.tab)));
 
-        // Mobile drawer
-        dom.menuToggle.addEventListener('click', () => dom.sidebar.classList.toggle('open'));
+        // Mobile drawer with backdrop
+        dom.menuToggle.addEventListener('click', () => {
+            dom.sidebar.classList.toggle('open');
+            if (dom.sidebarOverlay) dom.sidebarOverlay.classList.toggle('open', dom.sidebar.classList.contains('open'));
+        });
+        if (dom.sidebarOverlay) {
+            dom.sidebarOverlay.addEventListener('click', () => {
+                dom.sidebar.classList.remove('open');
+                dom.sidebarOverlay.classList.remove('open');
+            });
+        }
 
         // Chat Mode Selector
         dom.modeChips.forEach(chip => {
             chip.addEventListener('click', () => {
-                dom.modeChips.forEach(c => c.classList.remove('active'));
-                chip.classList.add('active');
-                state.mode = chip.dataset.mode;
+                const mode = chip.dataset.mode;
+                state.mode = mode;
+                dom.modeChips.forEach(c => {
+                    c.classList.toggle('active', c.dataset.mode === mode);
+                });
             });
         });
 

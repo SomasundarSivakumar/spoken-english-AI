@@ -1190,9 +1190,17 @@ input, textarea, select {
     flex-shrink: 0;
 }
 .lookup-header h3 {
-    font-size: 1.08rem;
+    font-size: 1.05rem;
     font-weight: 700;
     color: var(--text-main);
+    line-height: 1.35;
+    word-break: normal;
+}
+.tamil-inline {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--primary);
+    white-space: nowrap;
 }
 .lookup-header p {
     font-size: 0.82rem;
@@ -1793,6 +1801,11 @@ input, textarea, select {
     color: #fff;
 }
 
+/* ===== MOBILE BAR BASE (HIDDEN ON DESKTOP) ===== */
+.mobile-chat-mode-bar {
+    display: none;
+}
+
 /* ===== MOBILE BOTTOM NAVIGATION ===== */
 .mobile-bottom-nav {
     display: none;
@@ -1821,6 +1834,9 @@ input, textarea, select {
     height: 100%;
     color: var(--text-dim);
     transition: all 0.15s ease;
+}
+.mobile-nav-btn * {
+    pointer-events: none;
 }
 .mobile-nav-btn.active {
     color: var(--primary);
@@ -1881,115 +1897,568 @@ input, textarea, select {
 /* MOBILE PHONES (≤ 768px) */
 @media (max-width: 768px) {
     :root {
-        --topbar-h: 60px;
-        --bottom-nav-h: 60px;
+        --topbar-h: 56px;
+        --bottom-nav-base-h: 60px;
+        --safe-bottom: env(safe-area-inset-bottom, 0px);
+        --bottom-nav-h: calc(var(--bottom-nav-base-h) + var(--safe-bottom));
     }
 
-    /* Hide desktop sidebar */
+    /* Overall Layout: strict viewport bounds without position:fixed freeze */
+    html, body {
+        overflow: hidden;
+        height: 100%;
+        width: 100%;
+        margin: 0;
+        padding: 0;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .app-layout {
+        width: 100vw;
+        height: 100vh;
+        height: 100dvh;
+        overflow: hidden;
+        position: relative;
+    }
+
+    /* Main Content container: terminates exactly above the bottom nav */
+    .main-content {
+        flex: 1;
+        width: 100%;
+        height: calc(100% - var(--bottom-nav-h));
+        height: calc(100dvh - var(--bottom-nav-h));
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+        position: relative;
+    }
+
+    /* Mobile Sidebar & Drawer Overlay */
     .sidebar {
         position: fixed;
         left: 0;
         top: 0;
         bottom: 0;
+        width: 290px;
+        max-width: 82vw;
+        z-index: 1050;
         transform: translateX(-100%);
-        box-shadow: 8px 0 32px rgba(0, 0, 0, 0.25);
+        transition: transform 0.28s cubic-bezier(0.16, 1, 0.3, 1);
+        box-shadow: 10px 0 36px rgba(0, 0, 0, 0.28);
     }
     .sidebar.open {
         transform: translateX(0);
     }
+    .sidebar-overlay {
+        display: none;
+        position: fixed;
+        inset: 0;
+        background: rgba(15, 23, 42, 0.5);
+        backdrop-filter: blur(4px);
+        -webkit-backdrop-filter: blur(4px);
+        z-index: 1040;
+    }
+    .sidebar-overlay.open {
+        display: block;
+    }
 
-    /* Show mobile menu button and logo */
+    /* Top Bar: Clean, sleek, uncluttered */
+    .top-bar {
+        height: var(--topbar-h);
+        padding: 0 12px;
+        gap: 8px;
+        flex-shrink: 0;
+        background: var(--bg-surface-glass);
+        backdrop-filter: blur(16px);
+        -webkit-backdrop-filter: blur(16px);
+    }
+    .top-bar-left {
+        gap: 8px;
+        flex: 1;
+        min-width: 0;
+        overflow: hidden;
+    }
     .mobile-menu-btn {
         display: flex;
+        width: 38px;
+        height: 38px;
+        flex-shrink: 0;
+    }
+    .mobile-logo-header {
+        gap: 8px;
+        min-width: 0;
+        flex: 1;
+        overflow: hidden;
     }
     .mobile-logo-img {
         display: block;
+        width: 32px;
+        height: 32px;
+        border-radius: 8px;
+        flex-shrink: 0;
+    }
+    .title-wrap {
+        min-width: 0;
+        flex: 1;
+        overflow: hidden;
+    }
+    .title-wrap h1 {
+        font-size: 1.05rem;
+        font-weight: 700;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        letter-spacing: -0.01em;
     }
     .page-subtitle {
         display: none;
     }
 
-    /* Show bottom nav */
-    .mobile-bottom-nav {
+    .top-bar-right {
+        gap: 6px;
+        flex-shrink: 0;
+    }
+    /* Hide duplicate settings button and bulky mode pill from top-bar on mobile */
+    #settings-quick-btn {
+        display: none !important;
+    }
+    .top-bar .mode-selector-pill,
+    #chat-mode-pill {
+        display: none !important;
+    }
+    .icon-btn {
+        width: 38px;
+        height: 38px;
+        font-size: 0.92rem;
+        flex-shrink: 0;
+    }
+
+    /* Mobile Dedicated Chat Mode Bar */
+    .mobile-chat-mode-bar {
         display: flex;
+        align-items: center;
+        justify-content: space-around;
+        gap: 6px;
+        padding: 8px 12px;
+        background: var(--bg-surface);
+        border-bottom: 1px solid var(--border-subtle);
+        flex-shrink: 0;
+        z-index: 20;
+    }
+    .mobile-chat-mode-bar .mode-chip {
+        flex: 1;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 5px;
+        padding: 7px 10px;
+        font-size: 0.78rem;
+        font-weight: 600;
+        border-radius: var(--radius-full);
+        background: var(--bg-card);
+        border: 1px solid var(--border-subtle);
+        color: var(--text-muted);
+        transition: all 0.2s ease;
+        white-space: nowrap;
+    }
+    .mobile-chat-mode-bar .mode-chip.active {
+        background: var(--primary);
+        color: #ffffff;
+        border-color: var(--primary);
+        box-shadow: 0 2px 8px rgba(79, 70, 229, 0.3);
     }
 
-    /* Adjust main content & tab panes for bottom nav */
+    /* Tab Panes */
     .tab-pane {
-        height: calc(100% - var(--topbar-h) - var(--bottom-nav-h));
+        flex: 1;
+        height: 100%;
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
     }
 
-    .section-container {
-        padding: 16px 14px calc(var(--bottom-nav-h) + 20px);
+    /* CHAT TAB on Mobile: Native App Architecture */
+    #tab-chat.tab-pane.active {
+        display: flex;
+        flex-direction: column;
+        height: 100%;
+        overflow: hidden;
     }
-
-    .top-bar {
-        padding: 0 14px;
-    }
-
-    /* Chat Area */
     .chat-area {
-        padding: 14px 12px;
+        flex: 1;
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+        padding: 12px 10px 16px;
+    }
+    .chat-messages {
+        gap: 12px;
     }
     .message {
-        max-width: 95%;
+        max-width: 92%;
+        gap: 8px;
+    }
+    .msg-avatar {
+        width: 30px;
+        height: 30px;
+        font-size: 0.72rem;
+    }
+    .msg-avatar img {
+        width: 30px;
+        height: 30px;
     }
     .msg-bubble {
-        padding: 12px 14px;
-        font-size: 0.9rem;
+        padding: 10px 14px;
+        font-size: 0.88rem;
+        line-height: 1.48;
+        word-break: break-word;
+        overflow-wrap: anywhere;
     }
-    .welcome-hero-card {
-        padding: 24px 16px;
+    .tamil-explain-card {
+        padding: 10px 12px;
+        margin-top: 8px;
+        border-radius: var(--radius-sm);
+        word-break: break-word;
+        overflow-wrap: anywhere;
     }
-    .welcome-hero-card h2 {
-        font-size: 1.25rem;
+    .tamil-explain-title {
+        font-size: 0.75rem;
+        margin-bottom: 4px;
     }
-
-    /* Input Area on Mobile */
-    .input-area {
-        padding: 8px 12px 8px;
+    .tamil-content {
+        font-size: 0.82rem;
+        line-height: 1.45;
     }
-    #text-input {
-        font-size: 16px; /* Prevents auto zoom on iOS */
+    .msg-actions {
+        gap: 6px;
     }
-    .mic-btn, .send-btn {
-        width: 40px;
-        height: 40px;
-    }
-
-    /* Top bar pill condensed */
-    .mode-chip {
-        padding: 5px 8px;
+    .msg-btn {
+        padding: 5px 10px;
         font-size: 0.72rem;
     }
 
-    /* Word Lookup on Mobile */
-    .lookup-input-wrapper {
+    /* Welcome Card on Mobile */
+    .welcome-hero-card {
+        padding: 18px 12px;
+        margin: 6px auto 16px;
+    }
+    .welcome-avatar {
+        width: 54px;
+        height: 54px;
+        margin-bottom: 10px;
+        border-radius: 16px;
+    }
+    .welcome-hero-card h2 {
+        font-size: 1.2rem;
+        margin-bottom: 4px;
+    }
+    .welcome-subtitle {
+        font-size: 0.84rem;
+        margin-bottom: 6px;
+    }
+    .welcome-tamil-desc {
+        font-size: 0.8rem;
+        line-height: 1.4;
+        margin-bottom: 14px;
+    }
+    .feature-pills-row {
+        gap: 6px;
+        flex-wrap: wrap;
+        justify-content: center;
+    }
+    .feature-pill {
+        padding: 5px 9px;
+        font-size: 0.7rem;
+    }
+
+    /* Input Area on Mobile: docked directly above bottom nav */
+    .input-area {
+        flex-shrink: 0;
+        padding: 6px 10px 8px;
+        background: var(--bg-surface);
+        border-top: 1px solid var(--border-subtle);
+        box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.04);
+        z-index: 10;
+    }
+    .quick-prompts-bar {
+        gap: 6px;
+        padding-bottom: 4px;
+        margin-bottom: 4px;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: none;
+    }
+    .quick-prompts-bar::-webkit-scrollbar {
+        display: none;
+    }
+    .quick-chip {
+        padding: 4px 9px;
+        font-size: 0.72rem;
+        flex-shrink: 0;
+    }
+
+    /* Live Typing Meaning Bar on Mobile */
+    .typing-meaning-bar {
+        width: 100%;
+        box-sizing: border-box;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 5px 10px;
+        margin-bottom: 5px;
+        font-size: 0.78rem;
+        border-radius: var(--radius-sm);
+    }
+    .tmb-word, .tmb-tamil {
+        max-width: 40%;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .input-container {
+        gap: 8px;
+        align-items: flex-end;
+    }
+    .mic-btn, .send-btn {
+        width: 42px;
+        height: 42px;
+        flex-shrink: 0;
+    }
+    #text-input {
+        min-height: 42px;
+        max-height: 90px;
+        padding: 10px 14px;
+        font-size: 16px; /* Prevents auto zoom on iOS Safari */
+        border-radius: 20px;
+        line-height: 1.35;
+    }
+
+    /* MOBILE BOTTOM NAV BAR */
+    .mobile-bottom-nav {
+        display: flex;
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        height: var(--bottom-nav-h);
+        background: var(--bg-surface-glass);
+        backdrop-filter: blur(20px);
+        -webkit-backdrop-filter: blur(20px);
+        border-top: 1px solid var(--border-subtle);
+        z-index: 1000;
+        box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.05);
+        padding-bottom: var(--safe-bottom);
+        box-sizing: border-box;
+    }
+    .mobile-nav-btn {
+        -webkit-tap-highlight-color: transparent;
+        padding: 4px 0;
+        height: var(--bottom-nav-base-h);
+        display: flex;
         flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 2px;
+    }
+    .btn-icon {
+        font-size: 1.25rem;
+    }
+    .btn-text {
+        font-size: 0.65rem;
+    }
+
+    /* OTHER TABS: Scrollable container */
+    .section-container {
+        padding: 14px 12px calc(40px + var(--safe-bottom, 0px));
+        max-width: 100%;
+        box-sizing: border-box;
+    }
+    .section-hero {
+        margin-bottom: 16px;
+    }
+    .section-hero h2 {
+        font-size: 1.25rem;
+        line-height: 1.3;
+        word-break: normal;
+        overflow-wrap: break-word;
+    }
+    .section-hero p {
+        font-size: 0.82rem;
+        line-height: 1.45;
+    }
+
+    /* Word Lookup Card on Mobile */
+    .word-lookup-card {
+        padding: 14px;
+        margin-bottom: 16px;
+        gap: 10px;
+    }
+    .lookup-header {
+        gap: 10px;
+    }
+    .lookup-icon {
+        width: 36px;
+        height: 36px;
+        font-size: 1.3rem;
+    }
+    .lookup-header h3 {
+        font-size: 0.95rem;
+        line-height: 1.3;
+    }
+    .lookup-header p {
+        font-size: 0.78rem;
+    }
+    .lookup-input-wrapper {
+        position: relative;
+        flex-direction: column;
+        gap: 8px;
+    }
+    #word-search-input {
+        width: 100%;
+        box-sizing: border-box;
+        padding: 11px 36px 11px 12px;
+        font-size: 16px;
+    }
+    .btn-clear {
+        position: absolute;
+        right: 12px;
+        top: 21px;
+        transform: translateY(-50%);
     }
     .btn-lookup {
         width: 100%;
-    }
-    .btn-clear {
-        right: 14px;
-        top: 24px;
+        height: 42px;
+        font-size: 0.88rem;
     }
 
-    /* Grids */
+    /* Horizontal Category Scroll Pills */
+    .vocab-categories, .tenses-filters {
+        display: flex;
+        overflow-x: auto;
+        flex-wrap: nowrap;
+        gap: 6px;
+        padding-bottom: 6px;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: none;
+    }
+    .vocab-categories::-webkit-scrollbar, .tenses-filters::-webkit-scrollbar {
+        display: none;
+    }
+    .vocab-cat-btn, .filter-btn {
+        flex-shrink: 0;
+        padding: 6px 12px;
+        font-size: 0.76rem;
+        white-space: nowrap;
+    }
+
+    /* Grids & Cards on Mobile */
     .tenses-grid, .words-grid, .roleplay-cards-grid {
         grid-template-columns: 1fr;
+        gap: 12px;
+    }
+    .tense-card, .word-item-card, .roleplay-card, .settings-card {
+        padding: 16px 14px;
+    }
+    .tense-formula-box {
+        overflow-x: auto;
+    }
+    .formula-text {
+        word-break: break-word;
+        overflow-wrap: anywhere;
+    }
+    .tense-example-item {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 6px;
+    }
+    .play-example-btn {
+        align-self: flex-end;
     }
     .quiz-options-grid {
         grid-template-columns: 1fr;
+        gap: 8px;
+    }
+    .quiz-opt-btn {
+        min-height: 46px;
+        padding: 10px 14px;
+        font-size: 0.86rem;
+    }
+
+    /* Settings on mobile */
+    .settings-box {
+        padding: 16px 14px;
+        gap: 14px;
+    }
+    .difficulty-options {
+        grid-template-columns: 1fr;
+        gap: 8px;
+    }
+
+    .word-audio-actions, .card-audio-row, .lookup-actions-row {
+        flex-direction: column;
+        gap: 6px;
+    }
+    .word-audio-actions .msg-btn, .card-audio-row .msg-btn, .lookup-actions-row .msg-btn {
+        width: 100%;
+        justify-content: center;
+        height: 38px;
     }
 }
 
 /* VERY SMALL PHONES (≤ 380px) */
 @media (max-width: 380px) {
-    .mode-selector-pill {
-        display: none;
+    :root {
+        --topbar-h: 52px;
+    }
+    .top-bar {
+        padding: 0 8px;
+        gap: 6px;
+    }
+    .mobile-menu-btn {
+        width: 34px;
+        height: 34px;
+    }
+    .mobile-logo-img {
+        width: 28px;
+        height: 28px;
     }
     .title-wrap h1 {
-        font-size: 1rem;
+        font-size: 0.94rem;
+    }
+    .icon-btn {
+        width: 34px;
+        height: 34px;
+        font-size: 0.85rem;
+    }
+    .mobile-chat-mode-bar {
+        padding: 6px 8px;
+        gap: 4px;
+    }
+    .mobile-chat-mode-bar .mode-chip {
+        padding: 6px 6px;
+        font-size: 0.72rem;
+    }
+    .btn-text {
+        font-size: 0.62rem;
+    }
+    .feature-pill {
+        font-size: 0.65rem;
+        padding: 4px 7px;
+    }
+    .welcome-hero-card {
+        padding: 14px 10px;
+    }
+    .welcome-avatar {
+        width: 46px;
+        height: 46px;
+    }
+    .welcome-hero-card h2 {
+        font-size: 1.1rem;
+    }
+    .mic-btn, .send-btn {
+        width: 38px;
+        height: 38px;
+    }
+    #text-input {
+        min-height: 38px;
+        padding: 8px 12px;
     }
 }

@@ -81,6 +81,9 @@
             </div>
         </aside>
 
+        <!-- Mobile Drawer Backdrop Overlay -->
+        <div id="sidebar-overlay" class="sidebar-overlay"></div>
+
         <!-- MAIN CONTAINER -->
         <div class="main-content">
             
@@ -126,6 +129,13 @@
 
             <!-- TAB 1: CHAT & VOICE ASSISTANT -->
             <section id="tab-chat" class="tab-pane active">
+                <!-- Mobile Dedicated Chat Mode Selector -->
+                <div class="mobile-chat-mode-bar" id="mobile-chat-mode-bar">
+                    <button class="mode-chip active" data-mode="conversation" title="Natural Conversation">🗣️ Chat</button>
+                    <button class="mode-chip" data-mode="grammar" title="Grammar Correction">✏️ Grammar</button>
+                    <button class="mode-chip" data-mode="pronunciation" title="Pronunciation & Phonetics">👅 Accent</button>
+                </div>
+
                 <div id="chat-area" class="chat-area">
                     <div id="chat-messages" class="chat-messages">
                         <!-- Populated by JS -->
@@ -156,7 +166,7 @@
                             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
                         </button>
                         <div class="input-box-wrapper">
-                            <textarea id="text-input" placeholder="Type or click mic to speak... (ஆங்கிலம் அல்லது தமிழில் கேளுங்கள்)" rows="1"></textarea>
+                            <textarea id="text-input" placeholder="Type in English or தமிழ்..." rows="1"></textarea>
                             <span id="recording-indicator" class="recording-indicator hidden">
                                 <span class="rec-dot"></span> Listening...
                             </span>
@@ -217,7 +227,7 @@
                         <div class="lookup-header">
                             <span class="lookup-icon">🔍</span>
                             <div>
-                                <h3>Instant Word Meaning Lookup (உடனடி தமிழ் அர்த்தம்)</h3>
+                                <h3>Instant Word Meaning <span class="tamil-inline">· உடனடி தமிழ் அர்த்தம்</span></h3>
                                 <p>Type any English word to see its Tamil meaning, pronunciation & sentence</p>
                             </div>
                         </div>
