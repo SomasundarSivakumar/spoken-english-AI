@@ -8,19 +8,96 @@
     <meta name="theme-color" content="#070913">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <script>
+        // Anti-flicker: if previously logged in, prevent flash of Auth Gate on page reload
+        try {
+            if (localStorage.getItem('sw_cached_user')) {
+                document.documentElement.classList.add('user-cached-logged-in');
+            }
+        } catch (e) {}
+    </script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="style.css?v=6">
     <link rel="icon" type="image/png" href="logo.png">
     <link rel="apple-touch-icon" href="logo.png">
+    <!-- Firebase SDK (Compat for reliable vanilla JS execution) -->
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-analytics-compat.js"></script>
+    <script src="firebase-config.js?v=5"></script>
     <!-- Optional Free AI client SDK -->
     <script src="https://js.puter.com/v2/" defer></script>
 </head>
 <body>
 
+    <!-- ===== MANDATORY AUTHENTICATION GATE (LOGIN TO ENTER) ===== -->
+    <div id="auth-gate-modal" class="auth-gate-overlay">
+        <div class="auth-gate-card">
+            <div class="auth-gate-header">
+                <img src="logo.png" alt="Queen Rat AI" class="auth-gate-logo">
+                <div class="auth-gate-brand">
+                    <h2>Queen Rat <span class="logo-highlight">AI</span></h2>
+                    <span class="auth-gate-tagline">தமிழ் வழியில் Spoken English Tutor</span>
+                </div>
+            </div>
+
+            <div class="auth-gate-hero">
+                <h3>Welcome! உள்நுழைந்து தொடங்கவும்</h3>
+                <p>Sign in with your Google account to access your personal AI English tutor, daily tenses, vocabulary, and live reading practice studio.</p>
+            </div>
+
+            <div class="auth-gate-features">
+                <div class="gate-feat-item">
+                    <span class="gate-feat-icon">🗣️</span>
+                    <div class="gate-feat-text">
+                        <strong>Spoken English Voice Chat</strong>
+                        <small>Speak freely with instant Tamil explanations</small>
+                    </div>
+                </div>
+                <div class="gate-feat-item">
+                    <span class="gate-feat-icon">📖</span>
+                    <div class="gate-feat-text">
+                        <strong>Reading Practice Studio</strong>
+                        <small>Read aloud & get accuracy feedback via Mic</small>
+                    </div>
+                </div>
+                <div class="gate-feat-item">
+                    <span class="gate-feat-icon">🎲</span>
+                    <div class="gate-feat-text">
+                        <strong>Daily Tenses & Words</strong>
+                        <small>Non-repeating drills & instant audio</small>
+                    </div>
+                </div>
+                <div class="gate-feat-item">
+                    <span class="gate-feat-icon">☁️</span>
+                    <div class="gate-feat-text">
+                        <strong>Cloud Progress Sync</strong>
+                        <small>Your XP, vocabulary & scores saved safely</small>
+                    </div>
+                </div>
+            </div>
+
+            <div class="auth-gate-actions">
+                <button id="gate-google-login-btn" class="gate-google-btn" title="Sign in with your Google Account">
+                    <svg class="google-icon" viewBox="0 0 24 24" width="22" height="22">
+                        <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                        <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                        <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"/>
+                        <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/>
+                    </svg>
+                    <span>Sign In with Google to Enter</span>
+                </button>
+                <div id="gate-status-msg" class="gate-status-msg hidden"></div>
+                <small class="gate-subtext">🔒 Secure Google Sign-In</small>
+            </div>
+        </div>
+    </div>
+
     <!-- ===== MAIN APP SHELL ===== -->
-    <div id="app" class="app-layout">
+    <div id="app" class="app-layout auth-locked">
         
         <!-- SIDEBAR (Desktop / Tablet) -->
         <aside id="sidebar" class="sidebar">
@@ -34,27 +111,23 @@
                 </div>
             </div>
 
-            <!-- Free Badge -->
-            <div class="ai-status-badge">
-                <span class="status-dot"></span>
-                <span id="sidebar-provider-label">Free AI Active · No Key Needed</span>
-            </div>
-
             <!-- Navigation -->
             <nav class="sidebar-nav">
                 <button class="nav-item active" data-tab="chat">
                     <span class="nav-icon">💬</span>
                     <span class="nav-label">Voice & Chat <small>உரையாடல்</small></span>
                 </button>
+                <button class="nav-item" data-tab="reading">
+                    <span class="nav-icon">📖</span>
+                    <span class="nav-label">Reading Practice <small>வாசிப்புப் பயிற்சி</small></span>
+                </button>
                 <button class="nav-item" data-tab="tenses">
                     <span class="nav-icon">⏳</span>
                     <span class="nav-label">Daily Tenses <small>12 காலங்கள்</small></span>
-                    <span class="badge-mini">Daily</span>
                 </button>
                 <button class="nav-item" data-tab="words">
-                    <span class="nav-icon">📖</span>
+                    <span class="nav-icon">📚</span>
                     <span class="nav-label">Daily Words <small>தமிழ் அர்த்தம்</small></span>
-                    <span class="badge-mini">New</span>
                 </button>
                 <button class="nav-item" data-tab="roleplay">
                     <span class="nav-icon">🎭</span>
@@ -66,18 +139,48 @@
                 </button>
             </nav>
 
-            <!-- Quick Proverb / Tip Card in Sidebar -->
-            <div class="sidebar-tip-card">
-                <div class="tip-header">💡 Daily English Tip</div>
-                <p id="sidebar-daily-tip">"Practice 5 minutes every day. Consistency beats perfection!"</p>
-                <span class="tip-tamil">தினமும் 5 நிமிடம் பேசுங்கள்!</span>
-            </div>
+            <!-- Bottom Section: User Profile & Controls -->
+            <div class="sidebar-bottom-wrap">
+                <!-- User Profile Card -->
+                <div class="sidebar-user-card" id="sidebar-user-card">
+                    <div id="user-logged-out" class="user-auth-state">
+                        <button id="sidebar-google-login-btn" class="google-auth-btn" title="Sign in with your Google account">
+                            <svg class="google-icon" viewBox="0 0 24 24" width="18" height="18"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/></svg>
+                            <span>Sign In with Google</span>
+                        </button>
+                        <small class="auth-hint">Cloud Sync · முன்னேற்றம் சேமிக்க</small>
+                    </div>
+                    <div id="user-logged-in" class="user-auth-state hidden">
+                        <div class="user-info-row">
+                            <img id="user-avatar-img" class="user-avatar" src="logo.png" alt="User">
+                            <div class="user-details">
+                                <span id="user-display-name" class="user-name">Learner</span>
+                                <span id="user-email-text" class="user-email">user@gmail.com</span>
+                                <div class="user-progress-bar-wrap" title="Learning Progress">
+                                    <div class="user-progress-bar-fill" id="sidebar-progress-fill" style="width: 0%;"></div>
+                                </div>
+                                <span class="user-progress-text" id="sidebar-progress-text">Mastery: 0%</span>
+                            </div>
+                            <button id="user-logout-btn" class="icon-btn-sm" title="Sign Out">
+                                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+                            </button>
+                        </div>
+                    </div>
+                </div>
 
-            <div class="sidebar-footer">
-                <button id="clear-chat-btn" class="sidebar-action-btn" title="Clear Conversation">
-                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-2 14a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2L5 6m5 0V4a2 2 0 0 1 2-2h0a2 2 0 0 1 2 2v2"/></svg>
-                    Clear Chat
-                </button>
+                <!-- Quick Tip Card in Sidebar -->
+                <div class="sidebar-tip-card">
+                    <div class="tip-header">💡 Daily English Tip</div>
+                    <p id="sidebar-daily-tip">"Practice 5 minutes every day. Consistency beats perfection!"</p>
+                    <span class="tip-tamil">தினமும் 5 நிமிடம் பேசுங்கள்!</span>
+                </div>
+
+                <div class="sidebar-footer">
+                    <button id="clear-chat-btn" class="sidebar-action-btn" title="Clear Conversation">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-2 14a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2L5 6m5 0V4a2 2 0 0 1 2-2h0a2 2 0 0 1 2 2v2"/></svg>
+                        Clear Chat
+                    </button>
+                </div>
             </div>
         </aside>
 
@@ -119,6 +222,17 @@
                     <button id="voice-quick-toggle" class="icon-btn active" title="Toggle Auto-Voice">
                         <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>
                     </button>
+
+                    <!-- Google User Profile in Top Bar -->
+                    <div id="topbar-user-wrap" class="topbar-user-wrap">
+                        <button id="topbar-login-btn" class="topbar-google-btn" title="Sign in with Google">
+                            <svg class="google-icon" viewBox="0 0 24 24" width="16" height="16"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/></svg>
+                            <span>Login</span>
+                        </button>
+                        <div id="topbar-profile-badge" class="topbar-profile-badge hidden" title="Account options">
+                            <img id="topbar-avatar-img" class="user-avatar-sm" src="logo.png" alt="User">
+                        </div>
+                    </div>
 
                     <!-- Settings Button -->
                     <button id="settings-quick-btn" class="icon-btn" title="Open Settings">
@@ -195,15 +309,49 @@
                         <button class="filter-btn" data-filter="future">⏩ Future (எதிர்காலம்)</button>
                     </div>
 
+                    <!-- Dynamic Tense Practice Toolbar -->
+                    <div class="ai-feature-toolbar">
+                        <div class="ai-toolbar-info">
+                            <span class="ai-sparkle-icon">✨</span>
+                            <div>
+                                <strong>Dynamic Tense Drill (புதிய வாக்கியப் பயிற்சி)</strong>
+                                <small>ஒவ்வொரு முறையும் புதிய நிஜ உரையாடல் வாக்கியங்களை உருவாக்கிப் பழகுங்கள் — திரும்ப வராது!</small>
+                            </div>
+                        </div>
+                        <div class="ai-toolbar-buttons">
+                            <button id="ai-generate-tense-btn" class="btn-ai-glow">
+                                🎲 Generate New Sentences
+                            </button>
+                            <button id="ai-tense-quiz-btn" class="btn-ai-outline">
+                                🎯 New Practice Quiz
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Dynamic Tense Drill Container -->
+                    <div id="ai-tense-dynamic-box" class="ai-dynamic-box hidden">
+                        <div class="ai-box-header">
+                            <span class="ai-box-title" id="ai-tense-box-title">Spoken Practice Drill</span>
+                            <button id="ai-tense-close-btn" class="btn-close-sm">✕</button>
+                        </div>
+                        <div id="ai-tense-results" class="ai-tense-results"></div>
+                    </div>
+
                     <!-- Interactive Practice Quiz Banner -->
                     <div class="tenses-quiz-banner">
                         <div class="quiz-banner-text">
-                            <h3>🎯 Daily Tense Challenge (தினசரி தேர்வு)</h3>
-                            <p id="tense-quiz-question">Loading today's practice question...</p>
+                            <div class="quiz-banner-top-row">
+                                <h3>🎯 Daily Tense Challenge (தினசரி தேர்வு)</h3>
+                                <span id="tense-mastery-badge" class="score-pill">Tense Mastery: 0%</span>
+                            </div>
+                            <p id="tense-quiz-question">Loading fresh tense challenge...</p>
                             <div id="tense-quiz-options" class="quiz-options-grid"></div>
                             <div id="tense-quiz-feedback" class="quiz-feedback-box hidden"></div>
                         </div>
-                        <button id="next-tense-quiz-btn" class="btn-secondary-sm">Next Question ↻</button>
+                        <div class="quiz-footer-row">
+                            <button id="next-tense-quiz-btn" class="btn-secondary-sm">Next Question ↻</button>
+                            <span id="quiz-cloud-save-status" class="quiz-sync-status hidden">☁️ Progress saved to Cloud</span>
+                        </div>
                     </div>
 
                     <!-- Tenses Cards Grid -->
@@ -220,6 +368,28 @@
                         <div class="hero-badge">📖 Daily Spoken Vocabulary</div>
                         <h2>English Words with Tamil Meaning & Voice</h2>
                         <p>தினமும் புதிய வார்த்தைகள், தமிழ் அர்த்தம், உச்சரிப்பு மற்றும் வாக்கியப் பயிற்சி</p>
+                    </div>
+
+                    <!-- Dynamic Word Generator Toolbar -->
+                    <div class="ai-feature-toolbar">
+                        <div class="ai-toolbar-info">
+                            <span class="ai-sparkle-icon">✨</span>
+                            <div>
+                                <strong>Vocabulary Engine (திரும்ப வராத புதிய வார்த்தைகள்)</strong>
+                                <small>எப்போதும் ஒரே வார்த்தைகள் வராமல், புதிய பயன்பாட்டு வார்த்தைகளைத் தமிழில் கற்றுக் கொள்ளுங்கள்!</small>
+                            </div>
+                        </div>
+                        <div class="ai-toolbar-buttons">
+                            <button id="ai-generate-single-word-btn" class="btn-ai-glow">
+                                🎲 Generate Next Word
+                            </button>
+                            <button id="ai-generate-batch-words-btn" class="btn-ai-outline">
+                                📚 Generate 5 New Words
+                            </button>
+                            <button id="ai-vocab-quiz-btn" class="btn-ai-outline">
+                                🎯 New Vocab Quiz
+                            </button>
+                        </div>
                     </div>
 
                     <!-- Instant Word Lookup Search Box -->
@@ -333,39 +503,185 @@
                 </div>
             </section>
 
+            <!-- TAB: READING PRACTICE (படித்தல் பயிற்சி & உச்சரிப்புத் தேர்வு) -->
+            <section id="tab-reading" class="tab-pane">
+                <div class="section-container">
+                    <div class="section-hero">
+                        <div class="hero-badge">📖 English Reading & Speaking Studio</div>
+                        <h2>Reading Practice with Real-Time Speech Feedback</h2>
+                        <p>ஆங்கிலக் கதைகள் மற்றும் கட்டுரைகளை வாசித்து, உங்கள் உச்சரிப்பை சரிபார்த்துக் கொள்ளுங்கள் (Listen, Read Aloud & Instant Tamil Translation)</p>
+                    </div>
+
+                    <!-- Reading Controls & Topic Bar -->
+                    <div class="reading-controls-card">
+                        <div class="reading-topics-row">
+                            <span class="control-label">Topics:</span>
+                            <div class="reading-topic-chips" id="reading-topic-chips">
+                                <button class="topic-chip active" data-topic="daily-life">☕ Daily Life</button>
+                                <button class="topic-chip" data-topic="office-work">💼 Office & Interview</button>
+                                <button class="topic-chip" data-topic="travel">✈️ Travel & Airport</button>
+                                <button class="topic-chip" data-topic="story">🌟 Moral Story</button>
+                                <button class="topic-chip" data-topic="tamil-culture">🌾 Chennai & Tamil Culture</button>
+                                <button class="topic-chip" data-topic="restaurant">🍽️ Restaurant & Food</button>
+                            </div>
+                        </div>
+
+                        <div class="reading-length-row">
+                            <div class="diff-wrap">
+                                <span class="control-label">Sentence Mode:</span>
+                                <div class="reading-length-pills" id="reading-length-pills">
+                                    <button class="length-pill active" data-rlength="big">📜 Big Sentences & Paragraph (நீண்ட வாக்கியங்கள் & பெரிய பத்தி)</button>
+                                    <button class="length-pill" data-rlength="short">🌱 Short Sentences (எளிய சிறிய வாக்கியங்கள்)</button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="reading-level-row">
+                            <div class="diff-wrap">
+                                <span class="control-label">Difficulty:</span>
+                                <div class="reading-diff-pills" id="reading-diff-pills">
+                                    <button class="diff-pill active" data-rdiff="beginner">🌱 Beginner</button>
+                                    <button class="diff-pill" data-rdiff="intermediate">📚 Intermediate</button>
+                                    <button class="diff-pill" data-rdiff="advanced">🚀 Advanced</button>
+                                </div>
+                            </div>
+                            <button id="ai-generate-reading-btn" class="btn-ai-glow" title="AI generates a fresh big sentence reading passage">
+                                ✨ AI Generate Big Story (AI கதை உருவாக்குக)
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Main Reader Display Card -->
+                    <div class="reader-card" id="reader-card">
+                        <div class="reader-card-header">
+                            <div class="reader-meta">
+                                <span class="reader-badge" id="reader-badge">🌱 Beginner</span>
+                                <h3 id="reader-title" class="reader-title">A Morning Cup of Filter Coffee</h3>
+                                <span class="reader-est" id="reader-est">⏱️ ~1 min read · Click any word for instant Tamil meaning</span>
+                            </div>
+                            <div class="reader-header-actions">
+                                <button id="reader-speak-en-btn" class="msg-btn voice-en" title="Listen English Audio">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>
+                                    🔊 Listen English
+                                </button>
+                                <button id="reader-stop-audio-btn" class="btn-icon-sm hidden" title="Stop Audio">⏹️</button>
+                            </div>
+                        </div>
+
+                        <!-- English Passage Display with Interactive Word Highlights -->
+                        <div class="reader-passage-box" id="reader-passage-box">
+                            <!-- Populated with clickable words by JS -->
+                        </div>
+
+                        <!-- Speech Reading Test & Accuracy Meter -->
+                        <div class="reading-mic-section">
+                            <div class="mic-action-row">
+                                <button id="reader-record-btn" class="btn-read-aloud">
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+                                    <span id="reader-record-text">🎙️ Read Aloud & Test Speech (படித்துப் பேசிப் பார்க்க)</span>
+                                </button>
+                                <span id="reader-rec-status" class="reader-rec-status hidden">🔴 Listening to your voice... Speak clearly!</span>
+                            </div>
+
+                            <!-- Accuracy Score & Pronunciation Feedback Card -->
+                            <div id="reader-feedback-card" class="reader-feedback-card hidden">
+                                <div class="score-display-row">
+                                    <div class="score-circle" id="reader-score-circle">
+                                        <span id="reader-score-val">0%</span>
+                                        <small>Accuracy</small>
+                                    </div>
+                                    <div class="score-details">
+                                        <h4 id="reader-feedback-title">Great Effort!</h4>
+                                        <p id="reader-feedback-ta">உங்கள் வாசிப்பு முயற்சி அருமை!</p>
+                                        <div class="accuracy-legend">
+                                            <span class="legend-item"><span class="dot dot-green"></span> Correct Pronunciation</span>
+                                            <span class="legend-item"><span class="dot dot-red"></span> Missed / Mispronounced</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div id="reader-spoken-comparison" class="reader-comparison-box"></div>
+                            </div>
+                        </div>
+
+                        <!-- Full Tamil Translation Accordion -->
+                        <div class="reader-tamil-card">
+                            <div class="reader-tamil-toggle" id="reader-tamil-toggle">
+                                <div class="tamil-toggle-left">
+                                    <span>💡 தமிழ் முழு விளக்கம் & மொழிபெயர்ப்பு (Click to view Tamil Translation)</span>
+                                </div>
+                                <span class="toggle-arrow" id="reader-tamil-arrow">▼</span>
+                            </div>
+                            <div id="reader-tamil-content" class="reader-tamil-content hidden">
+                                <!-- Populated by JS -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
             <!-- TAB 5: SETTINGS -->
             <section id="tab-settings" class="tab-pane">
                 <div class="section-container settings-max-w">
                     <div class="section-hero">
                         <div class="hero-badge">⚙️ Preferences</div>
-                        <h2>Voice & AI Settings</h2>
-                        <p>உங்கள் கற்றல் விருப்பங்களை அமைத்துக் கொள்ளுங்கள்</p>
+                        <h2>Voice & Learning Preferences</h2>
+                        <p>உங்கள் கற்றல் மற்றும் கணக்கு அமைப்புகள்</p>
                     </div>
 
                     <div class="settings-card-group">
-                        
-                        <!-- AI Engine Selection -->
+
+                        <!-- User Profile Card -->
                         <div class="settings-box">
                             <div class="setting-title-row">
-                                <h3>🤖 AI Engine (செயற்கை நுண்ணறிவு)</h3>
-                                <span class="pill-badge pill-free">100% Free Available</span>
+                                <h3>👤 User Profile & Cloud Account</h3>
+                                <span id="firebase-status-pill" class="pill-badge pill-free">Connected</span>
                             </div>
-                            
-                            <div class="setting-item">
-                                <label for="ai-provider-select">Selected AI Engine</label>
-                                <select id="ai-provider-select" class="styled-select">
-                                    <option value="pollinations" selected>Free AI (Pollinations - Zero setup, No key needed)</option>
-                                    <option value="puter">Free AI (Puter.js - Cloud Model)</option>
-                                    <option value="offline">Smart Offline Tutor (Instant & Offline)</option>
-                                    <option value="groq">Groq Cloud (Use your own Groq Key)</option>
-                                </select>
-                            </div>
+                            <p class="setting-subtext">உங்கள் வார்த்தைப் பயிற்சி மற்றும் வாசிப்பு மதிப்பெண்கள் தானாகப் பாதுகாக்கப்படுகின்றன.</p>
 
-                            <!-- Optional Groq Key input (hidden if free AI) -->
-                            <div id="groq-key-container" class="setting-item hidden">
-                                <label for="groq-api-key">Your Groq API Key (Optional)</label>
-                                <input type="password" id="groq-api-key" class="styled-input" placeholder="gsk_...">
-                                <small class="setting-hint">Optional: Only required if you choose Groq Cloud above.</small>
+                            <!-- Current Login Status in Settings -->
+                            <div class="firebase-user-status-card" id="settings-firebase-user-card">
+                                <div id="settings-user-logged-out" class="user-auth-state">
+                                    <p class="auth-intro-text">Sign in with your Google account to sync your English vocabulary, quiz scores, and reading practice across devices.</p>
+                                    <button id="settings-google-login-btn" class="google-auth-btn" type="button">
+                                        <svg class="google-icon" viewBox="0 0 24 24" width="18" height="18"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/></svg>
+                                        <span>Sign In with Google</span>
+                                    </button>
+                                </div>
+                                <div id="settings-user-logged-in" class="user-auth-state hidden">
+                                    <div class="user-info-row">
+                                        <img id="settings-user-avatar" class="user-avatar" src="logo.png" alt="User">
+                                        <div class="user-details">
+                                            <strong id="settings-user-name">Learner</strong>
+                                            <span id="settings-user-email">user@gmail.com</span>
+                                            <small class="user-sync-badge">☁️ Cloud Progress Synced</small>
+                                        </div>
+                                        <button id="settings-logout-btn" class="btn-danger-sm" type="button">Sign Out</button>
+                                    </div>
+                                    <!-- Learning Mastery Dashboard -->
+                                    <div class="learning-progress-dashboard">
+                                        <div class="lpd-header">
+                                            <span class="lpd-title">📊 Learning Mastery (கற்றல் முன்னேற்றம்)</span>
+                                            <span id="settings-learning-pct" class="lpd-pct">0% Mastered</span>
+                                        </div>
+                                        <div class="progress-bar-track">
+                                            <div id="settings-progress-fill" class="progress-bar-fill" style="width: 0%;"></div>
+                                        </div>
+                                        <div class="stat-badge-grid">
+                                            <div class="stat-pill-item">
+                                                <span class="stat-label">⏳ Tenses Challenge</span>
+                                                <strong id="settings-tense-stats">0 / 0 correct (0 XP)</strong>
+                                            </div>
+                                            <div class="stat-pill-item">
+                                                <span class="stat-label">📚 Vocabulary</span>
+                                                <strong id="settings-vocab-stats">0 / 0 correct (0 XP)</strong>
+                                            </div>
+                                            <div class="stat-pill-item">
+                                                <span class="stat-label">📖 Reading Accuracy</span>
+                                                <strong id="settings-reading-stats">0% avg accuracy</strong>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                         </div>
 
@@ -397,7 +713,7 @@
                             <div class="setting-item flex-between">
                                 <div>
                                     <label>Auto-Play Audio on Replies</label>
-                                    <div class="setting-subtext">AI பதில் வந்ததும் தானாக வாசிக்கவும்</div>
+                                    <div class="setting-subtext">பதில் வந்ததும் தானாக வாசிக்கவும்</div>
                                 </div>
                                 <label class="switch">
                                     <input type="checkbox" id="auto-speak-cb" checked>
@@ -448,7 +764,7 @@
                         <!-- Reset / Info -->
                         <div class="settings-box">
                             <h3>ℹ️ App Information</h3>
-                            <p class="about-text">Queen Rat AI is designed to help Tamil speakers master Spoken English naturally without fear or expensive classes. Powered by Free AI and Web Speech APIs.</p>
+                            <p class="about-text">Queen Rat AI is designed to help Tamil speakers master Spoken English naturally through interactive conversation, daily drills, and reading practice.</p>
                             <button id="reset-defaults-btn" class="btn-danger-outline">Reset App Settings</button>
                         </div>
                     </div>
@@ -462,12 +778,16 @@
                 <span class="btn-icon">💬</span>
                 <span class="btn-text">Chat</span>
             </button>
+            <button class="mobile-nav-btn" data-tab="reading">
+                <span class="btn-icon">📖</span>
+                <span class="btn-text">Reading</span>
+            </button>
             <button class="mobile-nav-btn" data-tab="tenses">
                 <span class="btn-icon">⏳</span>
                 <span class="btn-text">Tenses</span>
             </button>
             <button class="mobile-nav-btn" data-tab="words">
-                <span class="btn-icon">📖</span>
+                <span class="btn-icon">📚</span>
                 <span class="btn-text">Words</span>
             </button>
             <button class="mobile-nav-btn" data-tab="roleplay">
@@ -481,6 +801,6 @@
         </nav>
     </div>
 
-    <script src="app.js"></script>
+    <script src="app.js?v=6"></script>
 </body>
 </html>

@@ -669,7 +669,7 @@
     const state = {
         activeTab: 'chat',
         mode: 'conversation', // 'conversation', 'grammar', 'pronunciation'
-        aiProvider: localStorage.getItem('sw_ai_provider') || 'pollinations',
+        aiProvider: localStorage.getItem('sw_ai_provider') || 'puter',
         groqKey: localStorage.getItem('sw_groq_key') || '',
         difficulty: localStorage.getItem('sw_difficulty') || 'beginner',
         autoSpeak: localStorage.getItem('sw_autoSpeak') !== 'false',
@@ -685,6 +685,13 @@
         currentVocabCat: 'all',
         vocabScore: parseInt(localStorage.getItem('sw_vocab_score') || '0', 10),
         currentVocabQuizIdx: 0,
+        seenWords: new Set(JSON.parse(localStorage.getItem('sw_seen_words') || '[]')),
+        readingTopic: 'daily-life',
+        readingDifficulty: 'beginner',
+        readingLength: 'big',
+        readingPassage: null,
+        isReadingRecording: false,
+        user: null,
         recognition: null,
         synth: window.speechSynthesis,
         voices: [],
@@ -716,6 +723,39 @@
         clearChatBtn: $('#clear-chat-btn'),
         sidebarProviderLabel: $('#sidebar-provider-label'),
 
+        // App & Auth Gate DOM
+        app: $('#app'),
+        authGateModal: $('#auth-gate-modal'),
+        gateGoogleLoginBtn: $('#gate-google-login-btn'),
+        gateStatusMsg: $('#gate-status-msg'),
+        sidebarGoogleLoginBtn: $('#sidebar-google-login-btn'),
+        userLoggedOut: $('#user-logged-out'),
+        userLoggedIn: $('#user-logged-in'),
+        userAvatarImg: $('#user-avatar-img'),
+        userDisplayName: $('#user-display-name'),
+        userEmailText: $('#user-email-text'),
+        userLogoutBtn: $('#user-logout-btn'),
+        topbarLoginBtn: $('#topbar-login-btn'),
+        topbarProfileBadge: $('#topbar-profile-badge'),
+        topbarAvatarImg: $('#topbar-avatar-img'),
+        settingsGoogleLoginBtn: $('#settings-google-login-btn'),
+        settingsLogoutBtn: $('#settings-logout-btn'),
+        settingsUserLoggedOut: $('#settings-user-logged-out'),
+        settingsUserLoggedIn: $('#settings-user-logged-in'),
+        settingsUserName: $('#settings-user-name'),
+        settingsUserEmail: $('#settings-user-email'),
+        settingsUserAvatar: $('#settings-user-avatar'),
+        toggleFirebaseKeysBtn: $('#toggle-firebase-keys-btn'),
+        firebaseKeysContainer: $('#firebase-keys-container'),
+        fbApiKey: $('#fb-api-key'),
+        fbAuthDomain: $('#fb-auth-domain'),
+        fbProjectId: $('#fb-project-id'),
+        fbStorageBucket: $('#fb-storage-bucket'),
+        fbAppId: $('#fb-app-id'),
+        saveFirebaseConfigBtn: $('#save-firebase-config-btn'),
+        firebaseSaveMsg: $('#firebase-save-msg'),
+        firebaseStatusPill: $('#firebase-status-pill'),
+
         // Chat
         chatArea: $('#chat-area'),
         chatMessages: $('#chat-messages'),
@@ -737,6 +777,14 @@
         tenseQuizOptions: $('#tense-quiz-options'),
         tenseQuizFeedback: $('#tense-quiz-feedback'),
         nextTenseQuizBtn: $('#next-tense-quiz-btn'),
+        tenseMasteryBadge: $('#tense-mastery-badge'),
+        quizCloudSaveStatus: $('#quiz-cloud-save-status'),
+        aiGenerateTenseBtn: $('#ai-generate-tense-btn'),
+        aiTenseQuizBtn: $('#ai-tense-quiz-btn'),
+        aiTenseDynamicBox: $('#ai-tense-dynamic-box'),
+        aiTenseResults: $('#ai-tense-results'),
+        aiTenseBoxTitle: $('#ai-tense-box-title'),
+        aiTenseCloseBtn: $('#ai-tense-close-btn'),
 
         // Words
         wordOfDayCard: $('#word-of-day-card'),
@@ -748,6 +796,33 @@
         wordSearchBtn: $('#word-search-btn'),
         wordClearBtn: $('#word-clear-btn'),
         wordLookupResult: $('#word-lookup-result'),
+        aiGenerateSingleWordBtn: $('#ai-generate-single-word-btn'),
+        aiGenerateBatchWordsBtn: $('#ai-generate-batch-words-btn'),
+        aiVocabQuizBtn: $('#ai-vocab-quiz-btn'),
+
+        // Reading Practice
+        readingTopicChips: $$('.topic-chip[data-topic]'),
+        readingDiffPills: $$('.diff-pill[data-rdiff]'),
+        readingLengthPills: $$('.length-pill[data-rlength]'),
+        aiGenerateReadingBtn: $('#ai-generate-reading-btn'),
+        readerCard: $('#reader-card'),
+        readerBadge: $('#reader-badge'),
+        readerTitle: $('#reader-title'),
+        readerEst: $('#reader-est'),
+        readerSpeakEnBtn: $('#reader-speak-en-btn'),
+        readerStopAudioBtn: $('#reader-stop-audio-btn'),
+        readerPassageBox: $('#reader-passage-box'),
+        readerRecordBtn: $('#reader-record-btn'),
+        readerRecordText: $('#reader-record-text'),
+        readerRecStatus: $('#reader-rec-status'),
+        readerFeedbackCard: $('#reader-feedback-card'),
+        readerScoreVal: $('#reader-score-val'),
+        readerFeedbackTitle: $('#reader-feedback-title'),
+        readerFeedbackTa: $('#reader-feedback-ta'),
+        readerSpokenComparison: $('#reader-spoken-comparison'),
+        readerTamilToggle: $('#reader-tamil-toggle'),
+        readerTamilContent: $('#reader-tamil-content'),
+        readerTamilArrow: $('#reader-tamil-arrow'),
 
         // Roleplay
         roleplayCards: $$('.roleplay-card'),
@@ -796,6 +871,183 @@
     };
 
     // ==========================================
+    // 4.6. LEARNING PROGRESS & FIREBASE CLOUD MANAGER
+    // ==========================================
+    const learningProgressManager = {
+        stats: {
+            tenseScore: 0,
+            tenseAnswered: 0,
+            tenseCorrect: 0,
+            vocabScore: 0,
+            vocabAnswered: 0,
+            vocabCorrect: 0,
+            readingTestsCount: 0,
+            readingAccuracyTotal: 0,
+            chatMessagesCount: 0,
+            learningPercentage: 0,
+            attendedTenseQuestions: [],
+            attendedVocabWords: []
+        },
+
+        async init() {
+            const uid = state.user ? state.user.uid : 'guest';
+            const localKey = `sw_progress_${uid}`;
+            try {
+                const saved = localStorage.getItem(localKey);
+                if (saved) {
+                    this.stats = { ...this.stats, ...JSON.parse(saved) };
+                }
+            } catch (e) {}
+
+            if (window.authManager && authManager.loadUserProgress) {
+                try {
+                    const cloud = await authManager.loadUserProgress();
+                    if (cloud) {
+                        this.stats = { ...this.stats, ...cloud };
+                    }
+                } catch (e) {}
+            }
+
+            this.calculateAndRender();
+        },
+
+        calculateLearningPercentage() {
+            // Tense accuracy & volume (up to 35%)
+            const tCount = this.stats.tenseAnswered || 0;
+            const tCorrect = this.stats.tenseCorrect || 0;
+            const tAcc = tCount > 0 ? (tCorrect / tCount) : 0;
+            const tVol = Math.min(1, tCount / 10);
+            const tenseScore = (tAcc * 0.7 + tVol * 0.3) * 35;
+
+            // Vocab accuracy & volume (up to 35%)
+            const vCount = this.stats.vocabAnswered || 0;
+            const vCorrect = this.stats.vocabCorrect || 0;
+            const vAcc = vCount > 0 ? (vCorrect / vCount) : 0;
+            const vVol = Math.min(1, (vCount + (this.stats.attendedVocabWords?.length || 0)) / 15);
+            const vocabScore = (vAcc * 0.7 + vVol * 0.3) * 35;
+
+            // Reading studio accuracy (up to 20%)
+            const rCount = this.stats.readingTestsCount || 0;
+            const rAvgAcc = rCount > 0 ? (this.stats.readingAccuracyTotal / rCount) / 100 : 0;
+            const rVol = Math.min(1, rCount / 4);
+            const readingScore = (rAvgAcc * 0.6 + rVol * 0.4) * 20;
+
+            // Chat conversations (up to 10%)
+            const convoScore = Math.min(1, (this.stats.chatMessagesCount || 0) / 10) * 10;
+
+            const total = Math.min(100, Math.max(0, Math.round(tenseScore + vocabScore + readingScore + convoScore)));
+            this.stats.learningPercentage = total;
+            return total;
+        },
+
+        async recordTenseAnswer(questionText, isCorrect, tenseName) {
+            this.stats.tenseAnswered = (this.stats.tenseAnswered || 0) + 1;
+            if (isCorrect) {
+                this.stats.tenseCorrect = (this.stats.tenseCorrect || 0) + 1;
+                this.stats.tenseScore = (this.stats.tenseScore || 0) + 10;
+            }
+            if (!this.stats.attendedTenseQuestions) this.stats.attendedTenseQuestions = [];
+            if (!this.stats.attendedTenseQuestions.includes(questionText)) {
+                this.stats.attendedTenseQuestions.push(questionText);
+            }
+
+            this.calculateLearningPercentage();
+            await this.sync();
+            this.render();
+        },
+
+        async recordVocabAnswer(word, isCorrect) {
+            this.stats.vocabAnswered = (this.stats.vocabAnswered || 0) + 1;
+            if (isCorrect) {
+                this.stats.vocabCorrect = (this.stats.vocabCorrect || 0) + 1;
+                this.stats.vocabScore = (this.stats.vocabScore || 0) + 10;
+            }
+            if (!this.stats.attendedVocabWords) this.stats.attendedVocabWords = [];
+            if (!this.stats.attendedVocabWords.includes(word)) {
+                this.stats.attendedVocabWords.push(word);
+            }
+
+            this.calculateLearningPercentage();
+            await this.sync();
+            this.render();
+        },
+
+        async recordReadingTest(accuracyPercent) {
+            this.stats.readingTestsCount = (this.stats.readingTestsCount || 0) + 1;
+            this.stats.readingAccuracyTotal = (this.stats.readingAccuracyTotal || 0) + accuracyPercent;
+            this.calculateLearningPercentage();
+            await this.sync();
+            this.render();
+        },
+
+        async recordChatMessage() {
+            this.stats.chatMessagesCount = (this.stats.chatMessagesCount || 0) + 1;
+            this.calculateLearningPercentage();
+            await this.sync();
+            this.render();
+        },
+
+        async sync() {
+            const uid = state.user ? state.user.uid : 'guest';
+            const localKey = `sw_progress_${uid}`;
+            this.stats.updatedAt = new Date().toISOString();
+            localStorage.setItem(localKey, JSON.stringify(this.stats));
+
+            if (window.authManager && authManager.saveUserProgress) {
+                await authManager.saveUserProgress(this.stats);
+            }
+        },
+
+        render() {
+            const pct = this.stats.learningPercentage || 0;
+
+            // Sidebar progress fill & text
+            const sideFill = document.getElementById('sidebar-progress-fill');
+            const sideText = document.getElementById('sidebar-progress-text');
+            if (sideFill) sideFill.style.width = `${pct}%`;
+            if (sideText) sideText.textContent = `Mastery: ${pct}%`;
+
+            // Settings progress fill & text
+            const settingsPct = document.getElementById('settings-learning-pct');
+            const settingsFill = document.getElementById('settings-progress-fill');
+            const settingsTense = document.getElementById('settings-tense-stats');
+            const settingsVocab = document.getElementById('settings-vocab-stats');
+            const settingsReading = document.getElementById('settings-reading-stats');
+
+            if (settingsPct) settingsPct.textContent = `${pct}% Mastered`;
+            if (settingsFill) settingsFill.style.width = `${pct}%`;
+            if (settingsTense) {
+                settingsTense.textContent = `${this.stats.tenseCorrect || 0} / ${this.stats.tenseAnswered || 0} correct (${this.stats.tenseScore || 0} XP)`;
+            }
+            if (settingsVocab) {
+                settingsVocab.textContent = `${this.stats.vocabCorrect || 0} / ${this.stats.vocabAnswered || 0} correct (${this.stats.vocabScore || 0} XP)`;
+            }
+            if (settingsReading) {
+                const avgAcc = this.stats.readingTestsCount > 0 
+                    ? Math.round(this.stats.readingAccuracyTotal / this.stats.readingTestsCount)
+                    : 0;
+                settingsReading.textContent = `${avgAcc}% avg accuracy (${this.stats.readingTestsCount || 0} tests)`;
+            }
+
+            // Tenses mastery badge
+            const tenseBadge = document.getElementById('tense-mastery-badge');
+            if (tenseBadge) {
+                const tCount = this.stats.tenseAnswered || 0;
+                const tCorrect = this.stats.tenseCorrect || 0;
+                const tAcc = tCount > 0 ? Math.round((tCorrect / tCount) * 100) : 0;
+                tenseBadge.textContent = `Tense Mastery: ${tAcc}% (${tCorrect}/${tCount})`;
+            }
+        },
+
+        calculateAndRender() {
+            this.calculateLearningPercentage();
+            this.render();
+        }
+    };
+
+    window.learningProgressManager = learningProgressManager;
+
+    // ==========================================
     // 5. FREE AI ENGINE & MULTI-PROVIDER
     // ==========================================
     const aiEngine = {
@@ -818,31 +1070,81 @@ CRITICAL RESPONSE FORMAT RULES:
 
 Tone: Warm, motivating, strictly supportive. Use genuine Tamil script (தமிழ் எழுத்துக்கள்).`;
 
-            // Route based on selected provider
+            // Route based on selected provider, with intelligent fallback chain
+            // Priority: Groq (if key) → Local Server AI (free, no key) → Puter.js → Pollinations → Offline
+
+            // 1. Try Groq first if user has a key
             if (state.aiProvider === 'groq' && state.groqKey) {
                 try {
                     return await aiEngine.callGroq(systemPrompt, userPrompt);
                 } catch (e) {
-                    console.warn('Groq failed, falling back to Free Pollinations AI:', e.message);
+                    console.warn('Groq failed, trying fallbacks:', e.message);
                 }
             }
 
-            if (state.aiProvider === 'puter' && window.puter && window.puter.ai) {
+            // 2. Primary: Local server AI proxy (free, no key, no CORS issues)
+            try {
+                return await aiEngine.callLocalServer(systemPrompt, userPrompt);
+            } catch (e) {
+                console.warn('Local server AI failed, trying other providers:', e.message);
+            }
+
+            // 3. Try Puter.js (free but may need sign-in)
+            if (window.puter && window.puter.ai) {
                 try {
                     const puterRes = await window.puter.ai.chat(`${systemPrompt}\n\nUser: ${userPrompt}`);
-                    if (puterRes) return puterRes.toString().trim();
+                    if (puterRes) {
+                        const reply = puterRes.toString().trim();
+                        if (reply.length > 0) return reply;
+                    }
                 } catch (e) {
-                    console.warn('Puter.js failed, falling back to Pollinations:', e.message);
+                    console.warn('Puter.js AI failed:', e.message);
                 }
             }
 
-            // Default & Primary: Free Pollinations AI (Zero API key needed, unlimited)
+            // 4. Try Pollinations as last online resort
             try {
                 return await aiEngine.callPollinations(systemPrompt, userPrompt);
             } catch (err) {
-                console.warn('Pollinations AI failed, using built-in Smart Offline Tutor:', err.message);
-                return aiEngine.generateOfflineFallback(userPrompt);
+                console.warn('Pollinations AI also failed:', err.message);
             }
+
+            // 5. Final offline fallback
+            console.warn('All AI providers failed, using built-in Smart Offline Tutor');
+            return aiEngine.generateOfflineFallback(userPrompt);
+        },
+
+        async callLocalServer(systemPrompt, userPrompt) {
+            const messages = [
+                { role: 'system', content: systemPrompt },
+                ...state.messages.slice(-6).map(m => ({
+                    role: m.role === 'user' ? 'user' : 'assistant',
+                    content: m.text.replace(/💡 தமிழ் விளக்கம்[\s\S]*$/, '').trim()
+                })),
+                { role: 'user', content: userPrompt }
+            ];
+
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 35000);
+
+            const res = await fetch('/api/chat', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ messages }),
+                signal: controller.signal
+            });
+
+            clearTimeout(timeoutId);
+
+            if (!res.ok) {
+                const errData = await res.json().catch(() => ({}));
+                throw new Error(errData.error || `Server AI HTTP ${res.status}`);
+            }
+
+            const data = await res.json();
+            const reply = data.choices?.[0]?.message?.content?.trim();
+            if (!reply) throw new Error('Empty response from Server AI');
+            return reply;
         },
 
         async callPollinations(systemPrompt, userPrompt) {
@@ -856,9 +1158,9 @@ Tone: Warm, motivating, strictly supportive. Use genuine Tamil script (தமி
             ];
 
             const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 12000);
+            const timeoutId = setTimeout(() => controller.abort(), 20000);
 
-            const res = await fetch('https://text.pollinations.ai/', {
+            const res = await fetch('https://gen.pollinations.ai/v1/chat/completions', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -875,6 +1177,16 @@ Tone: Warm, motivating, strictly supportive. Use genuine Tamil script (தமி
                 throw new Error(`Free AI HTTP ${res.status}`);
             }
 
+            // New endpoint returns OpenAI-compatible JSON
+            const contentType = res.headers.get('content-type') || '';
+            if (contentType.includes('application/json')) {
+                const data = await res.json();
+                const reply = data.choices?.[0]?.message?.content?.trim();
+                if (!reply) throw new Error('Empty response from Free AI');
+                return reply;
+            }
+
+            // Fallback: if plain text response
             const text = await res.text();
             if (!text || text.trim().length === 0) {
                 throw new Error('Empty response from Free AI');
@@ -920,32 +1232,128 @@ Tone: Warm, motivating, strictly supportive. Use genuine Tamil script (தமி
         },
 
         generateOfflineFallback(userPrompt) {
-            const promptLower = userPrompt.toLowerCase();
-            
-            if (promptLower.includes('hello') || promptLower.includes('hi') || promptLower.includes('வணக்கம்')) {
-                return `Hello there! I am delighted to practice English with you today. How is your day going so far? What did you have for breakfast?
+            const raw = userPrompt.trim();
+            const lower = raw.toLowerCase();
+            const historyCount = state.messages.filter(m => m.role === 'user').length;
+
+            // 1. Check for common grammar/spoken mistakes first
+            if (/\bmyself\s+[a-zA-Z]+/i.test(lower)) {
+                const name = lower.match(/\bmyself\s+([a-zA-Z]+)/i)?.[1] || 'friend';
+                const capName = name.charAt(0).toUpperCase() + name.slice(1);
+                return `It is wonderful to meet you, ${capName}! In professional English, instead of saying "Myself ${capName}", it is best to say "I am ${capName}" or "My name is ${capName}." What field do you work in or what are you studying?
 
 💡 தமிழ் விளக்கம் (Tamil Meaning & Explanation):
-- "Delighted" என்றால் "மிகவும் மகிழ்ச்சியடைகிறேன்" என்று அர்த்தம்.
-- "How is your day going?" என்பது ஒருவருடன் பேச்சைத் தொடங்கும் ஒரு இயல்பான ஆங்கிலக் கேள்வி.
-- பதில் கூற முயற்சி செய்யுங்கள்: "My day is going great! I had dosa for breakfast."`;
+- ஆங்கிலத்தில் தன்னை அறிமுகப்படுத்தும் போது "Myself [பெயர்]" என்று சொல்லக் கூடாது.
+- சரியான முறை: "I am ${capName}" அல்லது "My name is ${capName}."
+- அடுத்த கேள்வி: நீங்கள் என்ன வேலை செய்கிறீர்கள் அல்லது படிக்கிறீர்கள்?`;
             }
 
-            if (promptLower.includes('tense') || promptLower.includes('grammar') || promptLower.includes('இலக்கணம்')) {
-                return `Grammar is easiest when learned through everyday speaking! For example, whenever you talk about your daily habit, always use Simple Present: "I wake up at 6 AM."
+            if (/\bi\s+am\s+agree\b/i.test(lower)) {
+                return `I love that we agree! Just a quick tip: say "I agree" instead of "I am agree", because "agree" is already a verb. What made you feel that way?
 
 💡 தமிழ் விளக்கம் (Tamil Meaning & Explanation):
-- உங்கள் தினசரி வழக்கத்தைக் கூற Simple Present Tense பயன்படும்.
-- "I wake up" (நான் எழுகிறேன்), "I go to work" (நான் வேலைக்குச் செல்கிறேன்).
-- இப்போது உங்கள் வழக்கமான செயல்களில் ஒன்றை ஆங்கிலத்தில் கூறிப் பாருங்கள்!`;
+- "Agree" என்பதே ஒரு வினைச்சொல் (Verb) என்பதால் "am" சேர்க்கக் கூடாது.
+- "I am agree" ❌ -> "I agree" ✅
+- "நான் ஒப்புக்கொள்கிறேன்" என்று சொல்ல "I agree" அல்லது "I completely agree" எனப் பயன்படுத்தலாம்.`;
             }
 
-            return `That is a wonderful point! Practicing like this step-by-step is how you gain fluency. Could you tell me a little bit more about what you like to do on weekends?
+            if (/\bi\s+want\s+learn\b/i.test(lower)) {
+                return `That is an inspiring goal! Remember to include "to" after want: say "I want to learn English." Speaking every single day with me will build your fluency very fast. What is your biggest challenge in speaking English?
 
 💡 தமிழ் விளக்கம் (Tamil Meaning & Explanation):
-- "Fluency" என்றால் "சரளமாகத் தடையின்றிப் பேசுதல்" என்று பொருள்.
-- உங்கள் வாக்கியம் நன்றாக உள்ளது!
-- வார இறுதி நாட்களைப் பற்றி கூறலாம்: "On weekends, I like to relax with my family and watch movies."`;
+- "Want" என்ற சொல்லுக்குப் பிறகு மற்றொரு செயல் (Verb) வந்தால் இடையில் "to" வர வேண்டும்.
+- "I want learn" ❌ -> "I want to learn English" ✅
+- உங்கள் மிகப்பெரிய சவால் என்ன? (பயம் / வார்த்தைகள் நினைவுக்கு வராமல் இருப்பது / இலக்கணம்?)`;
+            }
+
+            if (/\bdidn't\s+(went|came|saw|ate|had)\b/i.test(lower)) {
+                return `Good try expressing that! Notice that after "didn't", we always use the base verb (V1): say "didn't go" or "didn't eat." Could you try saying that sentence again?
+
+💡 தமிழ் விளக்கம் (Tamil Meaning & Explanation):
+- "Didn't" வந்தாலே அடுத்து நிகழ்கால அடிப்படை வினையே (V1) வரவேண்டும்.
+- "Didn't went" ❌ -> "Didn't go" ✅
+- "Didn't ate" ❌ -> "Didn't eat" ✅`;
+            }
+
+            // 2. Name & Self Introduction
+            if (/\b(my name is|i am|i'm|im)\s+([a-zA-Z]+)/i.test(lower) && !lower.includes('good') && !lower.includes('fine')) {
+                const nameMatch = lower.match(/\b(?:my name is|i am|i'm|im)\s+([a-zA-Z]+)/i);
+                const userName = nameMatch ? nameMatch[1].charAt(0).toUpperCase() + nameMatch[1].slice(1) : 'there';
+                return `Nice to meet you, ${userName}! It is a pleasure to be your English speaking partner. Where are you from, and which city do you live in?
+
+💡 தமிழ் விளக்கம் (Tamil Meaning & Explanation):
+- "Nice to meet you" = உங்களைச் சந்தித்ததில் மகிழ்ச்சி!
+- "Where are you from?" = நீங்கள் எந்த ஊரைச் சேர்ந்தவர்?
+- நீங்கள் பதில் சொல்லலாம்: "I am from Chennai" அல்லது "I live in Coimbatore."`;
+            }
+
+            // 3. Food / Breakfast / Lunch / Meals
+            if (/\b(dosa|dosai|idli|idly|poori|pongal|rice|coffee|tea|breakfast|lunch|dinner|ate|had|bread|egg|chapati|food)\b/i.test(lower)) {
+                return `That sounds tasty and energizing! Starting your day with good food always puts you in a positive mood. Do you prefer cooking at home, or do you enjoy dining out at restaurants?
+
+💡 தமிழ் விளக்கம் (Tamil Meaning & Explanation):
+- "Dining out" என்றால் "வெளியே ஹோட்டலில் சாப்பிடுவது" என்று பொருள்.
+- "Tasty and energizing" = சுவையான மற்றும் புத்துணர்ச்சி அளிக்கும்.
+- பதில் கூறலாம்: "I prefer homemade food" (நான் வீட்டு உணவையே விரும்புகிறேன்) அல்லது "I love dining out on weekends."`;
+            }
+
+            // 4. Work / Study / Career
+            if (/\b(work|job|office|company|software|developer|engineer|teacher|student|college|school|studying|study|business)\b/i.test(lower)) {
+                return `That is fascinating! Being in that field must be exciting and keeps you constantly learning. What is one thing you enjoy most about your daily work or studies?
+
+💡 தமிழ் விளக்கம் (Tamil Meaning & Explanation):
+- "Fascinating" என்றால் "மிகவும் சுவாரசியமானது" என்று அர்த்தம்.
+- "Constantly learning" = தொடர்ந்து புதியவற்றைக் கற்றுக் கொண்டிருப்பது.
+- எளிதாகப் பதில் சொல்லுங்கள்: "I enjoy solving problems" அல்லது "I like meeting new people in my college."`;
+            }
+
+            // 5. City / Location
+            if (/\b(chennai|coimbatore|madurai|trichy|salem|bangalore|tamil nadu|india|live in|from)\b/i.test(lower)) {
+                return `What a vibrant and lovely place to live! Many learners from your region are achieving great fluency in English. How is the weather there today?
+
+💡 தமிழ் விளக்கம் (Tamil Meaning & Explanation):
+- "Vibrant" என்றால் "துடிப்பான / கலகலப்பான இடம்" என்று பொருள்.
+- "How is the weather?" = அங்கே இன்றைய வானிலை எப்படி இருக்கிறது?
+- பதில் சொல்லலாம்: "It is sunny and warm today" அல்லது "The weather is very pleasant."`;
+            }
+
+            // 6. Hobbies / Free time
+            if (/\b(cricket|movie|movies|cinema|music|reading|books|game|gaming|travel|cooking|drawing|gym)\b/i.test(lower)) {
+                return `That is an awesome hobby! Spending your free time doing what you love keeps your mind fresh. How often do you get time to pursue this?
+
+💡 தமிழ் விளக்கம் (Tamil Meaning & Explanation):
+- "Pursue" என்றால் "ஒரு விருப்பமான செயலில் தொடர்ந்து ஈடுபடுவது".
+- "How often" = எத்தனை முறை அல்லது எவ்வளவு அடிக்கடி?
+- பதில் சொல்லலாம்: "I play cricket every weekend" அல்லது "I listen to music every evening."`;
+            }
+
+            // 7. General Greetings
+            if (/\b(hello|hi|hey|good morning|good evening|good afternoon|வணக்கம்)\b/i.test(lower)) {
+                return `Hello! I'm doing great, thank you for asking. I'm excited to practice English speaking with you today. What's on your mind right now?
+
+💡 தமிழ் விளக்கம் (Tamil Meaning & Explanation):
+- "What's on your mind?" = நீங்கள் இப்போது என்ன யோசித்துக் கொண்டிருக்கிறீர்கள் / எதைப் பற்றி பேச விரும்புகிறீர்கள்?
+- நீங்கள் இயல்பாகப் பேசலாம்: "I want to practice speaking" அல்லது "I had a busy day today."`;
+            }
+
+            // 8. Dynamic multi-turn fallbacks if no specific topic triggered
+            const multiTurnFlows = [
+                {
+                    en: `That makes complete sense! You expressed your thought clearly. To practice more, could you describe what your typical morning routine looks like?`,
+                    ta: `- "Makes complete sense" = நீங்கள் சொல்வது முற்றிலும் புரிகிறது / நியாயமாக உள்ளது.\n- "Morning routine" = காலையில் நீங்கள் செய்யும் வழக்கமான செயல்கள்.\n- முயற்சி செய்யுங்கள்: "I wake up at 6 AM, drink coffee, and read news."`
+                },
+                {
+                    en: `I really enjoy talking with you! Your confidence is growing with every sentence. What is a goal you want to achieve this year?`,
+                    ta: `- "Confidence is growing" = உங்கள் தன்னம்பிக்கை கூடிக்கொண்டே போகிறது!\n- "Goal to achieve" = இந்த வருடம் நீங்கள் அடைய நினைக்கும் இலக்கு.\n- பதில் கூறலாம்: "My goal is to speak fluent English in meetings."`
+                },
+                {
+                    en: `Excellent effort! The secret to fluent English is regular conversation without worrying about making mistakes. Tell me, what kind of movies or series do you enjoy watching?`,
+                    ta: `- "Regular conversation" = தொடர்ச்சியான உரையாடல்.\n- "Without worrying" = கவலைப்படாமல் / தயங்காமல்.\n- பதில் கூறலாம்: "I enjoy comedy and action movies."`
+                }
+            ];
+
+            const selectedFlow = multiTurnFlows[historyCount % multiTurnFlows.length];
+            return `${selectedFlow.en}\n\n💡 தமிழ் விளக்கம் (Tamil Meaning & Explanation):\n${selectedFlow.ta}`;
         }
     };
 
@@ -1157,7 +1565,7 @@ Tone: Warm, motivating, strictly supportive. Use genuine Tamil script (தமி
                         கீழே உள்ள Mic அல்லது Text மூலம் இப்போதே பேசத் தொடங்குங்கள்!
                     </p>
                     <div class="feature-pills-row">
-                        <span class="feature-pill">✨ 100% Free AI</span>
+                        <span class="feature-pill">🎙️ Smart Voice Tutor</span>
                         <span class="feature-pill">🗣️ Tamil Explanation</span>
                         <span class="feature-pill">⏳ 12 Tenses Drills</span>
                         <span class="feature-pill">📖 Daily Words</span>
@@ -1273,6 +1681,9 @@ Tone: Warm, motivating, strictly supportive. Use genuine Tamil script (தமி
 
             chatManager.addMessage('user', text);
             chatManager.showTyping();
+            if (window.learningProgressManager) {
+                learningProgressManager.recordChatMessage();
+            }
 
             // If message is a single English word or "meaning of X", immediately display full definition!
             const singleWordMatch = text.match(/^(?:what is the meaning of |meaning of |define )?([a-zA-Z]{2,30})\??$/i);
@@ -1284,9 +1695,7 @@ Tone: Warm, motivating, strictly supportive. Use genuine Tamil script (தமி
                     chatManager.addMessage('ai', `**Word:** ${dictEntry.word} (${dictEntry.pos || 'Word'})\n**Tamil Sound:** [${dictEntry.phonetic || ''}]\n**Example:** "${dictEntry.exampleEn}"\n\n💡 தமிழ் விளக்கம் (Tamil Meaning & Explanation):\n- **அர்த்தம்:** ${dictEntry.tamilMeaning}\n- **வாக்கிய விளக்கம்:** ${dictEntry.exampleTa || dictEntry.tamilMeaning}`);
                     if (state.autoSpeak) {
                         voiceManager.speakEnglish(`${dictEntry.word}. ${dictEntry.exampleEn}`);
-                        setTimeout(() => {
-                            voiceManager.speakTamil(dictEntry.tamilMeaning + '. ' + (dictEntry.exampleTa || ''));
-                        }, 2200);
+                        // Only English auto-plays; Tamil voice plays on button click
                     }
                     state.isSending = false;
                     dom.sendBtn.disabled = !dom.textInput.value.trim();
@@ -1302,12 +1711,8 @@ Tone: Warm, motivating, strictly supportive. Use genuine Tamil script (தமி
 
                 if (state.autoSpeak) {
                     const parsed = chatManager.parseAIResponse(reply);
+                    // ONLY English voice auto-plays; Tamil audio plays only when user clicks "🗣️ தமிழ் குரல்"
                     voiceManager.speakEnglish(parsed.english);
-                    if (parsed.tamil) {
-                        setTimeout(() => {
-                            voiceManager.speakTamil(parsed.tamil);
-                        }, 2800);
-                    }
                 }
             } catch (err) {
                 chatManager.removeTyping();
@@ -1322,9 +1727,12 @@ Tone: Warm, motivating, strictly supportive. Use genuine Tamil script (தமி
         parseAIResponse(text) {
             const tamilMarker = text.search(/(💡?\s*தமிழ்\s*விளக்கம்|Tamil\s*Explanation|Explanation\s*in\s*Tamil)/i);
             if (tamilMarker !== -1) {
+                let tamilPart = text.substring(tamilMarker).trim();
+                // Strip redundant header line so the card header doesn't duplicate it
+                tamilPart = tamilPart.replace(/^💡?\s*தமிழ்\s*விளக்கம்[^\n]*\n?/i, '').trim();
                 return {
                     english: text.substring(0, tamilMarker).trim(),
-                    tamil: text.substring(tamilMarker).trim()
+                    tamil: tamilPart
                 };
             }
             return {
@@ -1447,8 +1855,244 @@ Tone: Warm, motivating, strictly supportive. Use genuine Tamil script (தமி
             });
         },
 
-        renderTenseQuiz() {
-            const quiz = TENSE_QUIZZES[state.currentTenseQuizIdx % TENSE_QUIZZES.length];
+        currentQuiz: null,
+        isFetchingQuiz: false,
+
+        async fetchNewAITenseQuiz() {
+            if (this.isFetchingQuiz) return;
+            this.isFetchingQuiz = true;
+
+            if (dom.nextTenseQuizBtn) dom.nextTenseQuizBtn.disabled = true;
+            dom.tenseQuizFeedback.className = 'quiz-feedback-box hidden';
+            dom.tenseQuizOptions.innerHTML = '';
+            dom.tenseQuizQuestion.innerHTML = `
+                <div class="quiz-loading-row">
+                    <span class="loading-spinner-sm"></span>
+                    <span>AI is crafting a brand new, non-repeating tense challenge...</span>
+                </div>
+            `;
+
+            const attended = (window.learningProgressManager && learningProgressManager.stats.attendedTenseQuestions) || [];
+            const recentExcludes = attended.slice(-6).map(q => `"${q.slice(0, 45)}..."`).join(', ');
+
+            // Randomly select one of the 12 tenses to test
+            const targetTense = TENSES_DATA[Math.floor(Math.random() * TENSES_DATA.length)];
+
+            const prompt = `Generate 1 unique multiple-choice English grammar quiz question focusing on the tense "${targetTense.name}" (${targetTense.formula}) for Tamil speakers learning spoken English.
+${recentExcludes ? `DO NOT repeat any of these recently answered questions: ${recentExcludes}.` : ''}
+Make it a natural everyday spoken English sentence with a blank (e.g. "________").
+Provide 4 plausible choices (with only 1 grammatically correct for "${targetTense.name}"), the 0-indexed correct option, and a crystal-clear explanation in Tamil explaining the rule and why the other options are wrong.
+Respond ONLY as a valid JSON object formatted as:
+{
+  "tense": "${targetTense.name}",
+  "question": "Sentence with blank...",
+  "options": ["Option A", "Option B", "Option C", "Option D"],
+  "correct": 0,
+  "explanation": "Tamil explanation of why this answer is correct..."
+}`;
+
+            try {
+                const res = await aiEngine.generateReply(prompt);
+                let match = res.match(/\{[\s\S]*\}/);
+                if (match) {
+                    const quizObj = JSON.parse(match[0]);
+                    if (quizObj.question && Array.isArray(quizObj.options) && quizObj.options.length === 4 && typeof quizObj.correct === 'number') {
+                        if (!attended.includes(quizObj.question)) {
+                            this.currentQuiz = quizObj;
+                            this.renderActiveQuiz(quizObj);
+                            this.isFetchingQuiz = false;
+                            if (dom.nextTenseQuizBtn) dom.nextTenseQuizBtn.disabled = false;
+                            return;
+                        }
+                    }
+                }
+            } catch (e) {
+                console.warn('AI Tense Quiz generation notice:', e);
+            }
+
+            // Fallback: Dynamic algorithmic tense generator (NOT static hardcoded array, combines random subjects, realistic verbs & time markers)
+            const dynamicQuiz = this.generateDynamicAlgorithmicQuiz(targetTense, attended);
+            this.currentQuiz = dynamicQuiz;
+            this.renderActiveQuiz(dynamicQuiz);
+            this.isFetchingQuiz = false;
+            if (dom.nextTenseQuizBtn) dom.nextTenseQuizBtn.disabled = false;
+        },
+
+        nextTenseQuiz() {
+            tensesManager.fetchNewAITenseQuiz();
+        },
+
+        async generateAITenseDrill() {
+            if (!dom.aiTenseDynamicBox) return;
+            const activeFilter = state.currentTenseFilter || 'all';
+            const pool = activeFilter === 'all' 
+                ? TENSES_DATA 
+                : TENSES_DATA.filter(t => t.category === activeFilter);
+            const tense = pool[Math.floor(Math.random() * pool.length)];
+
+            dom.aiTenseDynamicBox.classList.remove('hidden');
+            dom.aiTenseBoxTitle.textContent = `✨ AI Spoken Practice: ${tense.name} (${tense.tamilName})`;
+            dom.aiTenseResults.innerHTML = `
+                <div style="text-align:center; padding:18px; color:var(--text-muted);">
+                    <span class="typing-dot"></span> Generating 3 fresh real-life spoken sentences with AI...
+                </div>
+            `;
+
+            try {
+                const prompt = `Generate 3 fresh, practical, natural spoken English conversation sentences using "${tense.name}" (${tense.formula}).
+For each sentence, include a natural Tamil translation.
+Respond ONLY as a valid JSON array of objects with keys "en" and "ta":
+[
+  {"en": "Sentence 1", "ta": "Tamil translation 1"},
+  {"en": "Sentence 2", "ta": "Tamil translation 2"},
+  {"en": "Sentence 3", "ta": "Tamil translation 3"}
+]`;
+                const reply = await aiEngine.generateReply(prompt);
+                let jsonMatch = reply.match(/\[\s*\{[\s\S]*\}\s*\]/);
+                let sentences = [];
+                if (jsonMatch) {
+                    try {
+                        sentences = JSON.parse(jsonMatch[0]);
+                    } catch (e) {}
+                }
+                if (!sentences || sentences.length === 0) {
+                    sentences = [
+                        { en: `I always ${tense.category === 'past' ? 'checked' : 'check'} my emails before leaving the office.`, ta: "நான் அலுவலகத்தை விட்டுச் செல்லும் முன் எப்போதும் மின்னஞ்சல்களை சரிபார்க்கிறேன்." },
+                        { en: `She is sharing the project update with her team right now.`, ta: "அவள் இப்போது தனது குழுவுடன் திட்டத்தின் விவரங்களைப் பகிர்ந்து கொண்டிருக்கிறாள்." },
+                        { en: `We have prepared everything needed for tomorrow's meeting.`, ta: "நாளை நடைபெறும் கூட்டத்திற்குத் தேவையான அனைத்தையும் நாங்கள் தயார் செய்துள்ளோம்." }
+                    ];
+                }
+
+                dom.aiTenseResults.innerHTML = sentences.map(item => `
+                    <div class="ai-sentence-item">
+                        <div class="ai-sentence-content">
+                            <span class="ai-sentence-en">${chatManager.escapeHtml(item.en)}</span>
+                            <span class="ai-sentence-ta">${chatManager.escapeHtml(item.ta)}</span>
+                        </div>
+                        <button class="msg-btn voice-en play-ai-tense-btn" data-en="${chatManager.escapeHtml(item.en)}" title="Listen Pronunciation">
+                            🔊 Pronounce
+                        </button>
+                    </div>
+                `).join('');
+
+                dom.aiTenseResults.querySelectorAll('.play-ai-tense-btn').forEach(b => {
+                    b.addEventListener('click', () => {
+                        voiceManager.speakEnglish(b.dataset.en);
+                    });
+                });
+            } catch (err) {
+                dom.aiTenseResults.innerHTML = `<div style="color:var(--accent-rose); padding:10px;">Could not generate sentences right now. Please try again.</div>`;
+            }
+        },
+
+        generateDynamicAlgorithmicQuiz(targetTense, attendedList) {
+            const subjects = [
+                { en: "Arun", pronoun: "he", type: "sing" },
+                { en: "Priya", pronoun: "she", type: "sing" },
+                { en: "The software engineers", pronoun: "they", type: "plur" },
+                { en: "My uncle", pronoun: "he", type: "sing" },
+                { en: "Kavitha and Deepa", pronoun: "they", type: "plur" },
+                { en: "Our college team", pronoun: "it", type: "sing" },
+                { en: "Suresh", pronoun: "he", type: "sing" },
+                { en: "The passengers", pronoun: "they", type: "plur" },
+                { en: "Dr. Karthik", pronoun: "he", type: "sing" },
+                { en: "We", pronoun: "we", type: "plur" }
+            ];
+            const subj = subjects[Math.floor(Math.random() * subjects.length)];
+
+            const templates = {
+                'simple-present': {
+                    question: `${subj.en} usually ________ (read) the daily news every morning.`,
+                    options: [subj.type === 'sing' ? 'reads' : 'read', 'is reading', 'readed', 'will read'],
+                    correct: 0,
+                    explanation: `வழக்கமான தினசரி பழக்கவழக்கம் (Habitual action) என்பதால் Simple Present Tense ('${subj.type === 'sing' ? 'reads' : 'read'}') பயன்படும்.`
+                },
+                'present-continuous': {
+                    question: `Look! ${subj.en} ________ (practice) spoken English right now.`,
+                    options: [subj.type === 'sing' ? 'is practicing' : 'are practicing', 'practices', 'practiced', 'has practiced'],
+                    correct: 0,
+                    explanation: `இப்போது தற்போதைய தருணத்தில் தொடர்ந்து நிகழும் செயல் என்பதால் Present Continuous ('${subj.type === 'sing' ? 'is practicing' : 'are practicing'}') சரி.`
+                },
+                'present-perfect': {
+                    question: `${subj.en} already ________ (complete) the quarterly project report.`,
+                    options: [subj.type === 'sing' ? 'has completed' : 'have completed', 'completed', 'is completing', 'completes'],
+                    correct: 0,
+                    explanation: `சமீபத்தில் முடிவடைந்து அதன் தாக்கம் இப்போதும் இருப்பதால் Present Perfect Tense பயன்படும்.`
+                },
+                'present-perfect-continuous': {
+                    question: `${subj.en} ________ (work) in this tech company since 2021.`,
+                    options: [subj.type === 'sing' ? 'has been working' : 'have been working', 'is working', 'worked', 'was working'],
+                    correct: 0,
+                    explanation: `'since 2021' கடந்த காலத்தில் தொடங்கி இப்போதும் தொடர்ந்து நீடிப்பதால் Present Perfect Continuous சரி.`
+                },
+                'simple-past': {
+                    question: `Yesterday evening, ${subj.en} ________ (meet) the senior manager at the office.`,
+                    options: ['met', 'meets', 'has met', 'is meeting'],
+                    correct: 0,
+                    explanation: `'Yesterday' என்பது முடிவடைந்த கடந்த காலம், எனவே Simple Past Verb 'met' பயன்படுத்த வேண்டும்.`
+                },
+                'past-continuous': {
+                    question: `At 7 PM yesterday, ${subj.en} ________ (travel) to Madurai by train.`,
+                    options: [subj.type === 'sing' ? 'was traveling' : 'were traveling', 'traveled', 'is traveling', 'travels'],
+                    correct: 0,
+                    explanation: `கடந்த காலத்தில் ஒரு குறிப்பிட்ட நேரத்தில் நடந்து கொண்டிருந்த செயல் என்பதால் Past Continuous பயன்படும்.`
+                },
+                'past-perfect': {
+                    question: `The flight ________ (take) off before ${subj.en} arrived at the airport gate.`,
+                    options: ['had taken', 'took', 'has taken', 'takes'],
+                    correct: 0,
+                    explanation: `கடந்த காலத்தில் மற்றொரு செயலுக்கு முன்பே முற்றுப்பெற்ற முதல் செயலுக்கு Past Perfect ('had taken') வர வேண்டும்.`
+                },
+                'past-perfect-continuous': {
+                    question: `Before moving to Chennai, ${subj.en} ________ (live) in Trichy for seven years.`,
+                    options: ['had been living', 'was living', 'has been living', 'lived'],
+                    correct: 0,
+                    explanation: `கடந்த காலத்தில் மற்றொரு நிகழ்வு நடப்பதற்கு முன்புவரை தொடர்ந்து நிகழ்ந்ததால் Past Perfect Continuous சரி.`
+                },
+                'simple-future': {
+                    question: `Don't worry! ${subj.en} ________ (help) you prepare for the interview tomorrow.`,
+                    options: ['will help', 'helped', 'helps', 'helping'],
+                    correct: 0,
+                    explanation: `எதிர்காலத்தில் நடக்கப்போகும் உறுதிமொழிக்கு Simple Future ('will help') பயன்படுத்தப்படும்.`
+                },
+                'future-continuous': {
+                    question: `Tomorrow at 10 AM, ${subj.en} ________ (attend) a client meeting.`,
+                    options: ['will be attending', 'will attend', 'attends', 'attended'],
+                    correct: 0,
+                    explanation: `எதிர்காலத்தில் ஒரு குறிப்பிட்ட நேரத்தில் தொடர்ந்து நடைபெறும் செயலுக்கு Future Continuous ('will be attending') சரி.`
+                },
+                'future-perfect': {
+                    question: `By next month, ${subj.en} ________ (finish) all 12 tenses exercises.`,
+                    options: ['will have finished', 'will finish', 'finishes', 'finished'],
+                    correct: 0,
+                    explanation: `எதிர்காலத்தில் ஒரு குறிப்பிட்ட காலக்கெடுவுக்குள் முடிவடைந்திருக்கும் செயலுக்கு Future Perfect ('will have finished') பயன்படும்.`
+                },
+                'future-perfect-continuous': {
+                    question: `By December, ${subj.en} ________ (study) spoken English for six full months.`,
+                    options: ['will have been studying', 'will be studying', 'has been studying', 'will study'],
+                    correct: 0,
+                    explanation: `எதிர்காலக் குறிப்பிட்ட காலம் வரை தொடர்ந்து நீடிக்கப்போகும் செயலுக்கு Future Perfect Continuous சரி.`
+                }
+            };
+
+            const tKey = targetTense.id || 'simple-present';
+            const template = templates[tKey] || templates['simple-present'];
+
+            const opts = [...template.options];
+            const correctOpt = opts[0];
+            opts.sort(() => 0.5 - Math.random());
+            const correctIdx = opts.indexOf(correctOpt);
+
+            return {
+                tense: targetTense.name,
+                question: template.question,
+                options: opts,
+                correct: correctIdx,
+                explanation: template.explanation
+            };
+        },
+
+        renderActiveQuiz(quiz) {
             dom.tenseQuizQuestion.textContent = quiz.question;
             dom.tenseQuizFeedback.className = 'quiz-feedback-box hidden';
 
@@ -1459,7 +2103,7 @@ Tone: Warm, motivating, strictly supportive. Use genuine Tamil script (தமி
             `).join('');
 
             dom.tenseQuizOptions.querySelectorAll('.quiz-opt-btn').forEach(btn => {
-                btn.addEventListener('click', () => {
+                btn.addEventListener('click', async () => {
                     const selectedIdx = parseInt(btn.dataset.idx, 10);
                     const isCorrect = selectedIdx === quiz.correct;
 
@@ -1471,17 +2115,23 @@ Tone: Warm, motivating, strictly supportive. Use genuine Tamil script (தமி
 
                     dom.tenseQuizFeedback.className = `quiz-feedback-box ${isCorrect ? 'correct' : 'incorrect'}`;
                     dom.tenseQuizFeedback.innerHTML = `
-                        <strong>${isCorrect ? '🎉 சரி! (Correct!)' : '❌ தவறான விடை (Oops!)'}</strong><br>
+                        <strong>${isCorrect ? '🎉 சரி! (Correct! +10 XP)' : '❌ தவறான விடை (Oops!)'}</strong><br>
                         ${quiz.explanation}
                     `;
                     dom.tenseQuizFeedback.classList.remove('hidden');
+
+                    const cloudStatus = document.getElementById('quiz-cloud-save-status');
+                    if (cloudStatus) {
+                        cloudStatus.classList.remove('hidden');
+                        setTimeout(() => cloudStatus.classList.add('hidden'), 3500);
+                    }
+
+                    // Record learning progress and save to Firebase Cloud DB
+                    if (window.learningProgressManager) {
+                        await learningProgressManager.recordTenseAnswer(quiz.question, isCorrect, quiz.tense);
+                    }
                 });
             });
-        },
-
-        nextTenseQuiz() {
-            state.currentTenseQuizIdx++;
-            tensesManager.renderTenseQuiz();
         }
     };
 
@@ -1490,23 +2140,26 @@ Tone: Warm, motivating, strictly supportive. Use genuine Tamil script (தமி
     // ==========================================
     const wordsManager = {
         renderWordOfDay() {
-            // Pick based on day of year
-            const dayOfYear = Math.floor((new Date() - new Date(new Date().getFullYear(), 0, 0)) / 1000 / 60 / 60 / 24);
-            const wordObj = WORDS_DATA[dayOfYear % WORDS_DATA.length];
+            // Pick an unseen word if available
+            const unseen = WORDS_DATA.filter(w => !state.seenWords.has(w.word.toLowerCase()));
+            const wordObj = unseen.length > 0 ? unseen[0] : WORDS_DATA[0];
+            wordsManager.renderWordOfDayCard(wordObj);
+        },
 
+        renderWordOfDayCard(wordObj) {
             dom.wordOfDayCard.innerHTML = `
                 <div class="showcase-header">
-                    <span class="showcase-badge">🌟 Word of the Day (இன்றைய முக்கிய வார்த்தை)</span>
-                    <span class="word-phonetic">${wordObj.phonetic}</span>
+                    <span class="showcase-badge">🌟 Daily Word (இன்றைய முக்கிய வார்த்தை)</span>
+                    <span class="word-phonetic">${wordObj.phonetic || ''}</span>
                 </div>
                 <div class="word-main-row">
                     <h3 class="word-title">${wordObj.word}</h3>
-                    <span class="word-pos">(${wordObj.pos})</span>
+                    <span class="word-pos">(${wordObj.pos || 'Word'})</span>
                 </div>
                 <div class="word-tamil-meaning-box">${wordObj.tamilMeaning}</div>
                 <div class="word-example-box">
                     <div class="word-example-en">"${wordObj.exampleEn}"</div>
-                    <div class="word-example-ta">${wordObj.exampleTa}</div>
+                    <div class="word-example-ta">${wordObj.exampleTa || ''}</div>
                 </div>
                 <div class="word-audio-actions">
                     <button class="msg-btn voice-en play-showcase-en">
@@ -1520,11 +2173,188 @@ Tone: Warm, motivating, strictly supportive. Use genuine Tamil script (தமி
                 </div>
             `;
 
-            dom.wordOfDayCard.querySelector('.play-showcase-en').addEventListener('click', () => {
-                voiceManager.speakEnglish(wordObj.word + '. ' + wordObj.exampleEn);
+            dom.wordOfDayCard.querySelector('.play-showcase-en')?.addEventListener('click', () => {
+                voiceManager.speakEnglish(wordObj.word + '. ' + (wordObj.exampleEn || ''));
             });
-            dom.wordOfDayCard.querySelector('.play-showcase-ta').addEventListener('click', () => {
-                voiceManager.speakTamil(wordObj.tamilMeaning + '. ' + wordObj.exampleTa);
+            dom.wordOfDayCard.querySelector('.play-showcase-ta')?.addEventListener('click', () => {
+                voiceManager.speakTamil(wordObj.tamilMeaning + '. ' + (wordObj.exampleTa || ''));
+            });
+        },
+
+        async generateAIWord() {
+            dom.wordOfDayCard.innerHTML = `
+                <div style="text-align:center; padding:28px 16px; color:var(--text-muted);">
+                    <span class="typing-dot"></span> AI is selecting a brand new, non-repeating spoken English word with Tamil meaning...
+                </div>
+            `;
+
+            const excluded = Array.from(state.seenWords).slice(-40).join(', ');
+            const prompt = `Generate 1 unique, practical spoken English word that every Tamil speaker should know for fluent conversation.
+Do NOT use any of these already learned words: [${excluded}].
+Respond ONLY as a valid JSON object formatted as:
+{
+  "word": "Resilient",
+  "pos": "Adjective",
+  "phonetic": "ரி-ஸிலியன்ட்",
+  "tamilMeaning": "சவால்களைத் தாங்கி மீண்டும் மீண்டு எழக்கூடிய மன உறுதி",
+  "exampleEn": "She remained resilient despite facing many difficulties.",
+  "exampleTa": "பல இன்னல்களை எதிர்கொண்ட போதிலும் அவள் மன உறுதியோடு இருந்தாள்."
+}`;
+
+            try {
+                const reply = await aiEngine.generateReply(prompt);
+                let match = reply.match(/\{[\s\S]*\}/);
+                let newWord = null;
+                if (match) {
+                    try {
+                        newWord = JSON.parse(match[0]);
+                    } catch (e) {}
+                }
+
+                if (!newWord || !newWord.word) {
+                    const unseen = WORDS_DATA.filter(w => !state.seenWords.has(w.word.toLowerCase()));
+                    newWord = unseen.length > 0 ? unseen[Math.floor(Math.random() * unseen.length)] : WORDS_DATA[Math.floor(Math.random() * WORDS_DATA.length)];
+                }
+
+                state.seenWords.add(newWord.word.toLowerCase());
+                localStorage.setItem('sw_seen_words', JSON.stringify(Array.from(state.seenWords)));
+                if (window.authManager) {
+                    authManager.saveUserProgress({ seenWordsCount: state.seenWords.size });
+                }
+
+                const existingIdx = WORDS_DATA.findIndex(w => w.word.toLowerCase() === newWord.word.toLowerCase());
+                if (existingIdx >= 0) WORDS_DATA.splice(existingIdx, 1);
+                WORDS_DATA.unshift({ ...newWord, cat: newWord.cat || 'daily' });
+
+                wordsManager.renderWordOfDayCard(newWord);
+                wordsManager.renderWordsList(state.currentVocabCat);
+            } catch (err) {
+                console.warn('AI word generation error:', err);
+                wordsManager.renderWordOfDay();
+            }
+        },
+
+        async generateBatchWords(count = 5) {
+            if (!dom.aiGenerateBatchWordsBtn) return;
+            dom.aiGenerateBatchWordsBtn.disabled = true;
+            dom.aiGenerateBatchWordsBtn.textContent = 'Generating 5 words...';
+
+            const excluded = Array.from(state.seenWords).slice(-50).join(', ');
+            const prompt = `Generate ${count} essential spoken English words for Tamil speakers with phonetic sound, Tamil meaning, and real conversational example.
+Do NOT repeat any of: [${excluded}].
+Respond ONLY as a valid JSON array of objects:
+[
+  {
+    "word": "Persevere",
+    "pos": "Verb",
+    "phonetic": "பெர்-ஸி-வியர்",
+    "tamilMeaning": "கடினமான சூழ்நிலையிலும் தளராமல் தொடர்ந்து முயற்சி செய்தல்",
+    "exampleEn": "If you persevere every day, your English will become fluent.",
+    "exampleTa": "நீங்கள் தினமும் தொடர்ந்து முயற்சி செய்தால் உங்கள் ஆங்கிலம் சரளமாகும்."
+  }
+]`;
+
+            try {
+                const reply = await aiEngine.generateReply(prompt);
+                let match = reply.match(/\[\s*\{[\s\S]*\}\s*\]/);
+                if (match) {
+                    const batch = JSON.parse(match[0]);
+                    batch.forEach(w => {
+                        state.seenWords.add(w.word.toLowerCase());
+                        const exIdx = WORDS_DATA.findIndex(x => x.word.toLowerCase() === w.word.toLowerCase());
+                        if (exIdx >= 0) WORDS_DATA.splice(exIdx, 1);
+                        WORDS_DATA.unshift({ ...w, cat: 'daily' });
+                    });
+                    localStorage.setItem('sw_seen_words', JSON.stringify(Array.from(state.seenWords)));
+                    wordsManager.renderWordsList(state.currentVocabCat);
+                    wordsManager.renderWordOfDayCard(batch[0]);
+                }
+            } catch (e) {
+                console.warn('Batch words error:', e);
+            } finally {
+                dom.aiGenerateBatchWordsBtn.disabled = false;
+                dom.aiGenerateBatchWordsBtn.textContent = '📚 Generate 5 New Words';
+            }
+        },
+
+        async generateAIVocabQuiz() {
+            dom.vocabQuizCard.innerHTML = `<div style="text-align:center; padding:18px; color:#fff;">Generating brand new AI Vocab Challenge...</div>`;
+            const prompt = `Generate 1 English vocabulary multiple choice question testing the Tamil meaning of a high-value English word.
+Respond ONLY as JSON:
+{
+  "word": "Diligent",
+  "pos": "Adjective",
+  "correctMeaning": "கடின உழைப்பு மற்றும் கவனத்துடன் செயல்படும் தன்மை",
+  "distractors": ["சோம்பேறித்தனமாக இருப்பது", "அவசரமாக முடிவெடுப்பது", "பிறரை ஏமாற்றுவது"],
+  "exampleEn": "She is a diligent student who practices English daily.",
+  "exampleTa": "அவள் தினமும் ஆங்கிலம் பழகும் கடின உழைப்புமிக்க மாணவி."
+}`;
+
+            try {
+                const res = await aiEngine.generateReply(prompt);
+                let match = res.match(/\{[\s\S]*\}/);
+                if (match) {
+                    const quizData = JSON.parse(match[0]);
+                    wordsManager.renderCustomVocabQuiz(quizData);
+                    return;
+                }
+                wordsManager.renderVocabQuiz();
+            } catch (e) {
+                wordsManager.renderVocabQuiz();
+            }
+        },
+
+        renderCustomVocabQuiz(q) {
+            const options = [...q.distractors, q.correctMeaning].sort(() => 0.5 - Math.random());
+            dom.vocabQuizCard.innerHTML = `
+                <div class="quiz-q-row">
+                    <span style="font-size: 1.1rem; font-weight:700; color:#fff;">Word: "${q.word}" (${q.pos || 'Word'})</span>
+                    <button class="play-example-btn quiz-sound-btn" title="Hear Word">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>
+                    </button>
+                </div>
+                <div class="quiz-options-grid" id="vocab-opts-grid">
+                    ${options.map(opt => `
+                        <button class="quiz-opt-btn" data-meaning="${chatManager.escapeHtml(opt)}">${opt}</button>
+                    `).join('')}
+                </div>
+                <div id="vocab-feedback-box" class="quiz-feedback-box hidden"></div>
+            `;
+
+            dom.vocabQuizCard.querySelector('.quiz-sound-btn')?.addEventListener('click', () => {
+                voiceManager.speakEnglish(q.word);
+            });
+
+            dom.vocabQuizCard.querySelectorAll('.quiz-opt-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const isCorrect = btn.dataset.meaning === q.correctMeaning;
+                    if (isCorrect) {
+                        state.vocabScore += 10;
+                        localStorage.setItem('sw_vocab_score', state.vocabScore);
+                        dom.vocabScoreBadge.textContent = `Score: ${state.vocabScore}`;
+                        if (window.authManager) {
+                            authManager.saveUserProgress({ vocabScore: state.vocabScore });
+                        }
+                    }
+                    if (window.learningProgressManager) {
+                        learningProgressManager.recordVocabAnswer(q.word, isCorrect);
+                    }
+
+                    dom.vocabQuizCard.querySelectorAll('.quiz-opt-btn').forEach(b => {
+                        b.disabled = true;
+                        if (b.dataset.meaning === q.correctMeaning) b.classList.add('correct');
+                        if (b === btn && !isCorrect) b.classList.add('incorrect');
+                    });
+
+                    const fb = dom.vocabQuizCard.querySelector('#vocab-feedback-box');
+                    fb.className = `quiz-feedback-box ${isCorrect ? 'correct' : 'incorrect'}`;
+                    fb.innerHTML = `
+                        <strong>${isCorrect ? '🎉 மிகச் சரி! (+10 pts)' : '❌ தவறான பதில்'}</strong><br>
+                        "${q.word}" என்பதன் தமிழ் அர்த்தம்: <strong>${q.correctMeaning}</strong><br>
+                        <em>உதாரணம்: ${q.exampleEn} (${q.exampleTa || ''})</em>
+                    `;
+                    fb.classList.remove('hidden');
+                });
             });
         },
 
@@ -1624,6 +2454,9 @@ Tone: Warm, motivating, strictly supportive. Use genuine Tamil script (தமி
                         state.vocabScore += 10;
                         localStorage.setItem('sw_vocab_score', state.vocabScore);
                         dom.vocabScoreBadge.textContent = `Score: ${state.vocabScore}`;
+                    }
+                    if (window.learningProgressManager) {
+                        learningProgressManager.recordVocabAnswer(currentWord.word, isCorrect);
                     }
 
                     const fb = $('#vocab-feedback-box');
@@ -1828,7 +2661,7 @@ Respond ONLY in this valid JSON format:
                         dom.wordLookupResult.classList.remove('hidden');
                         dom.wordLookupResult.innerHTML = `
                             <div style="display:flex; justify-content:space-between; align-items:center; font-size:0.88rem; color:var(--text-muted); flex-wrap:wrap; gap:8px;">
-                                <span>No local match for <strong>"${chatManager.escapeHtml(val)}"</strong>. Look up online with Free AI?</span>
+                                <span>No local match for <strong>"${chatManager.escapeHtml(val)}"</strong>. Look up online?</span>
                                 <button id="btn-quick-lookup-ai" class="btn-secondary-sm">Find Tamil Meaning ↗</button>
                             </div>
                         `;
@@ -1905,6 +2738,737 @@ Respond ONLY in this valid JSON format:
     };
 
     // ==========================================
+    // 10.5. READING PRACTICE & PRONUNCIATION TEST STUDIO (BIG SENTENCES & AI ENGINE)
+    // ==========================================
+    const readingManager = {
+        passages: {
+            'daily-life': {
+                beginner: {
+                    big: {
+                        title: 'The Joy of Morning Filter Coffee and Tamil Family Traditions',
+                        badge: '🌱 Beginner · 📜 Big Sentences',
+                        est: '⏱️ ~2 min read · Click any word for Tamil meaning',
+                        en: 'Every morning across countless homes in Tamil Nadu, the entire neighborhood comes alive with the irresistible aroma of freshly brewed filter coffee pouring into traditional brass dabarah sets. Waking up before the sunrise, family members gather together in the kitchen to share peaceful moments and enjoy their hot beverages, which immediately provides boundless energy for the busy hours ahead. While the morning newspapers arrive and temple bells gently chime in the background, parents and children engage in cheerful conversations about their daily schedules and future goals. Consequently, taking time to savor this simple morning ritual not only awakens the body and mind, but also strengthens the emotional bond that keeps the entire household harmoniously united.',
+                        ta: 'தமிழ்நாட்டில் உள்ள எண்ணற்ற வீடுகளில் ஒவ்வொரு காலையும் பாரம்பரிய பித்தளை டவரா செட்களில் சுடச்சுட வார்க்கப்படும் ஃபில்டர் காபியின் அலாதியான நறுமணத்துடன் விடியல் தொடங்குகிறது. சூரிய உதயத்திற்கு முன்பே எழுந்து, குடும்ப உறுப்பினர்கள் சமையலறையில் கூடி அமைதியான தருணங்களைப் பகிர்ந்து கொண்டு சூடான காபியை ரசிக்கிறார்கள்; இது வரவிருக்கும் பரபரப்பான நேரத்திற்கு அளப்பரிய ஆற்றலை உடனே தருகிறது. காலை நாளிதழ்கள் வந்துசேர, பின்னணியில் கோவில் மணிகள் மெல்ல ஒலிக்க, பெற்றோர்களும் குழந்தைகளும் தங்களின் அன்றாட பணிகள் மற்றும் இலக்குகளைப் பற்றி உற்சாகமாக உரையாடுகிறார்கள். எனவே, இந்த எளிய காலை வழக்கத்தை ரசித்து அனுபவிப்பது உடலையும் மனதையும் புத்துணர்ச்சியடையச் செய்வது மட்டுமல்லாமல், ஒட்டுமொத்த குடும்பத்தையும் அன்பால் ஒன்றிணைக்கும் உணர்வுபூர்வமான பிணைப்பையும் பலப்படுத்துகிறது.'
+                    },
+                    short: {
+                        title: 'A Morning Cup of Filter Coffee',
+                        badge: '🌱 Beginner · Short Sentences',
+                        est: '⏱️ ~1 min read · Click any word for Tamil meaning',
+                        en: 'Every morning in Tamil Nadu starts with the aroma of hot filter coffee. Families wake up early and enjoy their fresh morning brew together. It gives great energy and brings everyone together before a busy day begins.',
+                        ta: 'தமிழ்நாட்டில் ஒவ்வொரு காலையும் சுடச்சுட ஃபில்டர் காபியின் நறுமணத்துடன் தொடங்குகிறது. குடும்பங்கள் அதிகாலையில் எழுந்து புத்துணர்ச்சியூட்டும் காலைக் காபியை ஒன்றாக ருசிக்கிறார்கள். இது நல்ல சுறுசுறுப்பை அளித்து, ஒரு பரபரப்பான நாள் தொடங்குவதற்கு முன் அனைவரையும் ஒன்றிணைக்கிறது.'
+                    }
+                },
+                intermediate: {
+                    big: {
+                        title: 'The Rejuvenating Magic of Saturday Mornings by the Beach',
+                        badge: '📚 Intermediate · 📜 Big Sentences',
+                        est: '⏱️ ~2 min read · Click any word for Tamil meaning',
+                        en: 'After enduring an exceptionally exhausting work week filled with endless meetings and tight deadlines, relaxing on a breezy Saturday morning provides an incomparable sense of physical and mental renewal. Countless city dwellers choose to take an early stroll along the sandy shores of Marina beach, where the crisp ocean wind and rhythmic crashing of waves wash away every lingering stress of the corporate world. Meanwhile, others prefer spending these quiet weekend hours diving into thought-provoking literature, listening to soulful melodies, or preparing elaborate homemade brunches for their families. Ultimately, carving out intentional space for genuine relaxation not only restores our creative vitality, but also equips us with the clarity and resilience needed to conquer future aspirations.',
+                        ta: 'முடிவில்லாத சந்திப்புகளும் கடுமையான காலக்கெடுவும் நிறைந்த ஒரு பரபரப்பான வேலை வாரத்திற்குப் பிறகு, இதமான சனிக்கிழமை காலை ஓய்வெடுப்பது உடலுக்கும் மனதுக்கும் ஈடு இணையற்ற புத்துணர்ச்சியை அளிக்கிறது. பல நகர மக்கள் மெரினா கடற்கரையின் மணற்பரப்பில் அதிகாலை நடைப்பயிற்சி செய்வதைத் தேர்வு செய்கிறார்கள்; அங்கு வீசும் புத்துணர்ச்சியூட்டும் கடல் காற்றும் சீரான அலைகளின் ஓசையும் கார்ப்பரேட் உலகின் அனைத்து மன அழுத்தங்களையும் விரட்டியடிக்கின்றன. அதே நேரத்தில், மற்றவர்கள் இந்த அமைதியான வார இறுதி நேரங்களை சிந்தனையைத் தூண்டும் புத்தகங்களைப் படிப்பதிலும், மெல்லிய இசையைக் கேட்பதிலும், குடும்பத்தினருக்கு விருப்பமான உணவுகளைச் சமைப்பதிலும் கழிக்க விரும்புகிறார்கள். இறுதியில், ஓய்வுக்காகத் திட்டமிட்டு நேரம் ஒதுக்குவது நமது படைப்பாற்றல் திறனை மீட்டெடுப்பது மட்டுமல்லாமல், எதிர்கால லட்சியங்களை வெல்வதற்குத் தேவையான மனத் தெளிவையும் உறுதியையும் நமக்கு வழங்குகிறது.'
+                    },
+                    short: {
+                        title: 'The Art of Weekend Relaxation',
+                        badge: '📚 Intermediate · Short Sentences',
+                        est: '⏱️ ~1 min read · Click any word for Tamil meaning',
+                        en: 'After a hectic work week, relaxing on Saturday morning is truly rejuvenating. Some people prefer taking a peaceful morning walk along the Marina beach, feeling the gentle sea breeze. Others love spending quiet hours reading inspiring books or preparing special homemade meals for their loved ones.',
+                        ta: 'ஒரு பரபரப்பான வேலை வாரத்திற்குப் பிறகு, சனிக்கிழமை காலை ஓய்வெடுப்பது புத்துணர்ச்சி அளிக்கும் விஷயமாகும். சிலர் மெரினா கடற்கரையில் அமைதியான காலை நடைப்பயிற்சி மேற்கொண்டு, இதமான கடல் காற்றை ரசிக்க விரும்புகிறார்கள்.'
+                    }
+                },
+                advanced: {
+                    big: {
+                        title: 'Cultivating Resilience and the Modern Growth Mindset',
+                        badge: '🚀 Advanced · 📜 Big Sentences',
+                        est: '⏱️ ~3 min read · Click any word for Tamil meaning',
+                        en: 'In an era characterized by rapid technological disruption and unpredictable socioeconomic shifts, cultivating profound mental resilience and intellectual curiosity empowers individuals to navigate unprecedented complexities with poise and wisdom. When professionals view setbacks not as permanent defeats but rather as invaluable learning catalysts, they naturally unlock higher levels of creativity, adaptability, and emotional intelligence. Furthermore, proactively soliciting and thoughtfully integrating constructive feedback inevitably accelerates long-term career growth, while dismantling the crippling fear of making mistakes. Therefore, true personal mastery lies in embracing continuous self-evolution, fostering empathy in communication, and remaining steadfast in our pursuit of purposeful excellence.',
+                        ta: 'விரைவான தொழில்நுட்ப மாற்றங்களும் கணிக்க முடியாத சமூக-பொருளாதார ஏற்ற இறக்கங்களும் நிறைந்த இக்காலகட்டத்தில், ஆழ்ந்த மன உறுதியையும் அறிவார்ந்த ஆர்வத்தையும் வளர்த்துக்கொள்வது, முன்னெப்போதும் இல்லாத சிக்கல்களை அமைதியோடும் விவேகத்தோடும் எதிர்கொள்ள மக்களுக்கு உதவுகிறது. தொழில் வல்லுநர்கள் பின்னடைவுகளை நிரந்தரத் தோல்விகளாகப் பார்க்காமல் விலைமதிப்பற்ற கற்றல் வாய்ப்புகளாகக் கருதும் போது, அவர்கள் இயற்கையாகவே அதிக அளவிலான படைப்பாற்றல், சூழ்நிலைக்கு ஏற்ப மாறும் தன்மை மற்றும் உணர்ச்சிசார் நுண்ணறிவை வெளிப்படுத்துகிறார்கள். மேலும், ஆக்கபூர்வமான கருத்துக்களை முன்வந்து கேட்டு அவற்றைச் சிந்தித்துச் செயல்படுத்துவது நீண்டகால தொழில் வளர்ச்சியைத் துரிதப்படுத்துவதோடு, தவறு செய்துவிடுவோமோ என்ற அச்சத்தையும் தகர்த்தெறிகிறது. எனவே, உண்மையான மனித மேன்மை என்பது தொடர்ச்சியான சுய முன்னேற்றத்தை ஏற்றுக்கொள்வதிலும், இரக்கத்துடன் பேசுவதிலும், அர்த்தமுள்ள சிறப்பை அடைவதில் உறுதியாக இருப்பதிலுமே அடங்கியுள்ளது.'
+                    },
+                    short: {
+                        title: 'Mastering the Mindset of Continuous Growth',
+                        badge: '🚀 Advanced · Short Sentences',
+                        est: '⏱️ ~1 min read · Click any word for Tamil meaning',
+                        en: 'Cultivating resilience and intellectual curiosity empowers individuals to navigate unprecedented challenges with composure. Embracing constructive feedback rather than resisting it inevitably accelerates personal and professional development.',
+                        ta: 'மன உறுதியையும் அறிவார்ந்த ஆர்வத்தையும் வளர்த்துக் கொள்வது, முன்னெப்போதும் இல்லாத சவால்களை அமைதியோடு எதிர்கொள்ள மனிதர்களுக்கு ஆற்றலை அளிக்கிறது. ஆக்கபூர்வமான கருத்துக்களை மறுக்காமல் ஏற்றுக் கொள்வது தனிப்பட்ட மற்றும் தொழில்முறை வளர்ச்சியை துரிதப்படுத்துகிறது.'
+                    }
+                }
+            },
+            'office-work': {
+                beginner: {
+                    big: {
+                        title: 'Stepping Into the Modern Corporate Workplace',
+                        badge: '🌱 Beginner · 📜 Big Sentences',
+                        est: '⏱️ ~2 min read · Click any word for Tamil meaning',
+                        en: 'Arriving at the software technology park on my very first morning, I felt a dynamic mix of nervous anticipation and tremendous enthusiasm as I walked through the gleaming glass entrance. My project manager welcomed me with a warm and reassuring handshake, immediately introducing me to kind colleagues who were eager to show me around the modern office facilities and explain our team objectives. Over a friendly cup of tea in the cafeteria, experienced team members patiently answered my questions regarding daily workflows and shared practical advice on how to collaborate smoothly. By the end of the orientation session, all my initial hesitations had completely vanished, leaving me feeling deeply motivated and genuinely proud to embark on this promising professional career journey.',
+                        ta: 'எனது முதல் நாள் காலையில் மென்பொருள் தொழில்நுட்பப் பூங்காவிற்கு வந்தபோது, பளபளக்கும் கண்ணாடி நுழைவாயில் வழியே நுழைகையில் எனக்குள் ஒருவித பதற்றமும் அதே சமயம் அளவற்ற உற்சாகமும் கலந்திருந்தது. எனது திட்ட மேலாளர் புன்னகையுடனும் கனிவான கைக்குலுக்கலுடனும் என்னை வரவேற்று, அலுவலக வசதிகளைச் சுற்றிக் காட்டவும் எங்கள் குழுவின் நோக்கங்களை விவரிக்கவும் தயாராக இருந்த அன்பான சகாக்களுக்கு என்னை உடனடியாக அறிமுகப்படுத்தினார். சிற்றுண்டிச்சாலையில் சுவையான தேநீர் அருந்தியபடி, அனுபவம் வாய்ந்த குழு உறுப்பினர்கள் அன்றாட பணி நடைமுறைகள் குறித்த எனது சந்தேகங்களுக்குப் பொறுமையாகப் பதிலளித்து, மற்றவர்களுடன் சுமுகமாக இணைந்து பணியாற்றுவது குறித்த நடைமுறை ஆலோசனைகளைப் பகிர்ந்துகொண்டனர். அறிமுக அமர்வு முடியும் போது, எனது ஆரம்பகால தயக்கங்கள் அனைத்தும் முற்றிலும் மறைந்து, இந்த சிறந்த தொழில் பயணத்தைத் தொடங்குவதில் நான் மிகுந்த உந்துதலையும் உண்மையான பெருமையையும் உணர்ந்தேன்.'
+                    },
+                    short: {
+                        title: 'My First Day at Office',
+                        badge: '🌱 Beginner · Short Sentences',
+                        est: '⏱️ ~1 min read · Click any word for Tamil meaning',
+                        en: 'Today is my first day at the new software office. My manager introduced me to the entire team with a warm smile. Everyone was helpful and showed me my workstation. I am excited to learn new skills here.',
+                        ta: 'இன்று புதிய மென்பொருள் அலுவலகத்தில் எனது முதல் நாள். எனது மேலாளர் புன்னகையோடு என்னை முழு குழுவிற்கும் அறிமுகப்படுத்தினார். அனைவரும் உதவிகரமாக இருந்து எனது பணி இடத்தைக் காட்டினார்கள்.'
+                    }
+                },
+                intermediate: {
+                    big: {
+                        title: 'Delivering High-Impact Corporate Presentations with Confidence',
+                        badge: '📚 Intermediate · 📜 Big Sentences',
+                        est: '⏱️ ~2 min read · Click any word for Tamil meaning',
+                        en: 'Clear and persuasive verbal communication represents the undeniable cornerstone of professional credibility, particularly when presenting critical strategic proposals before senior international stakeholders. Prior to stepping into the boardroom, successful professionals diligently organize their key arguments into concise visual slides, rehearse their vocal pacing, and anticipate probing inquiries that might challenge their proposals. While explaining complex software architectures or financial forecasts, maintaining steady eye contact and employing precise industry vocabulary enables speakers to project unwavering authority and inspire confidence. Ultimately, transforming anxiety into poised enthusiasm ensures that your innovative proposals are not merely heard, but enthusiastically approved by organizational decision-makers.',
+                        ta: 'தெளிவான மற்றும் ஈர்க்கக்கூடிய பேச்சுத் தொடர்பு என்பது தொழில்முறைக் களத்தில் நம்பகத்தன்மையின் மறுக்க முடியாத அடித்தளமாகும்; குறிப்பாக மூத்த சர்வதேசத் தலைவர்கள் முன் முக்கியமான மூலோபாயத் திட்டங்களை முன்வைக்கும் போது இது மிகவும் அவசியமாகிறது. கூட்ட அறைக்குள் நுழைவதற்கு முன், வெற்றிகரமான தொழில் வல்லுநர்கள் தங்கள் முக்கிய வாதங்களை நேர்த்தியான காட்சிகளாக ஒழுங்கமைத்து, பேசும் வேகத்தைப் பயிற்சி செய்து, தங்கள் திட்டத்திற்கு வரக்கூடிய கடினமான கேள்விகளை முன்கூட்டியே கணிக்கிறார்கள். சிக்கலான மென்பொருள் வடிவமைப்பு அல்லது நிதிநிலை அறிக்கைகளை விளக்கும் போது, பார்வையாளர்களை நேருக்கு நேர் பார்த்து துல்லியமான சொற்களைப் பயன்படுத்துவது பேச்சாளரின் தன்னம்பிக்கையையும் அதிகாரத்தையும் வெளிப்படுத்துகிறது. இறுதியில், பதற்றத்தைத் தன்னம்பிக்கையாக மாற்றுவது உங்கள் புதிய யோசனைகளை வெறும் கருத்துக்களாக அல்லாமல், நிறுவன முடிவெடுப்பவர்களால் உற்சாகமாக ஏற்றுக்கொள்ளப்படும் வெற்றிகரமான திட்டங்களாக மாற்றுகிறது.'
+                    },
+                    short: {
+                        title: 'Preparing for an Effective Client Meeting',
+                        badge: '📚 Intermediate · Short Sentences',
+                        est: '⏱️ ~1 min read · Click any word for Tamil meaning',
+                        en: 'Clear communication is the cornerstone of successful corporate collaboration. Before entering a high-stakes presentation, it is essential to organize your key talking points clearly, anticipate tough questions, and speak with steady confidence.',
+                        ta: 'தெளிவான தகவல் பரிமாற்றமே வெற்றிகரமான நிறுவன ஒத்துழைப்பின் அடித்தளமாகும். ஒரு முக்கியமான விளக்கக்காட்சியில் நுழைவதற்கு முன், முக்கிய கருத்துக்களைத் தெளிவாக ஒழுங்கமைத்து தன்னம்பிக்கையுடன் பேசுவது அவசியமாகும்.'
+                    }
+                },
+                advanced: {
+                    big: {
+                        title: 'Transformational Leadership and Cross-Functional Synergies',
+                        badge: '🚀 Advanced · 📜 Big Sentences',
+                        est: '⏱️ ~3 min read · Click any word for Tamil meaning',
+                        en: 'Visionary leadership in high-velocity tech ecosystems transcends conventional task delegation, demanding instead the deliberate cultivation of psychological safety where team members feel intrinsically inspired to voice bold innovations. When departmental silos are systematically dissolved in favor of transparent, interdisciplinary collaboration, engineering velocity and client satisfaction experience unprecedented exponential gains. Moreover, emotionally intelligent leaders consistently model intellectual humility by actively listening to diverse perspectives, celebrating constructive dissent, and prioritizing long-term mentorship over short-term expediency. As organizations expand globally, this unwavering commitment to empathetic excellence and meritocracy distinguishes enduring market pioneers from transient enterprises.',
+                        ta: 'வேகமாக வளரும் தொழில்நுட்பச் சூழலில் தொலைநோக்குத் தலைமைத்துவம் என்பது வழக்கமான பணிகளைப் பகிர்ந்தளிப்பதை விட மேலானது; துணிச்சலான புதுமைகளை அச்சமின்றி வெளிப்படுத்த குழு உறுப்பினர்களை ஊக்குவிக்கும் ஒரு பாதுகாப்பான சூழலை உருவாக்குவது இதற்கு அவசியமாகிறது. துறைசார்ந்த தடைகள் தகர்க்கப்பட்டு வெளிப்படையான, பல்துறை ஒருங்கிணைப்பு ஏற்படும் போது, உற்பத்தி வேகமும் வாடிக்கையாளர் திருப்தியும் வியத்தகு முறையில் பன்மடங்கு உயர்கிறது. மேலும், சிறந்த தலைவர்கள் பல்வேறு மாறுபட்ட கருத்துக்களைக் கூர்ந்து கவனிப்பதன் மூலமும், ஆக்கபூர்வமான கருத்து வேறுபாடுகளை வரவேற்பதன் மூலமும், குறுகிய கால லாபத்தை விட நீண்டகால வழிகாட்டுதலுக்கு முன்னுரிமை அளிப்பதன் மூலமும் முன்மாதிரியாகத் திகழ்கிறார்கள். நிறுவனங்கள் உலகளவில் விரிவடையும் போது, மனிதநேய மேன்மைக்கும் திறமைக்கும் அளிக்கப்படும் இந்த அசைக்க முடியாத முக்கியத்துவமே ஒரு நிறுவனத்தை நீண்டகால சந்தை முன்னோடியாக நிலைநிறுத்துகிறது.'
+                    },
+                    short: {
+                        title: 'Strategic Leadership and Team Synergy',
+                        badge: '🚀 Advanced · Short Sentences',
+                        est: '⏱️ ~1 min read · Click any word for Tamil meaning',
+                        en: 'Exemplary leadership hinges upon the ability to articulate a compelling vision while fostering psychological safety across diverse teams. High-performing organizations consistently prioritize transparency and meritocracy.',
+                        ta: 'சிறந்த தலைமைத்துவம் என்பது பன்முகத்தன்மை கொண்ட குழுக்களுக்கு உளவியல் ரீதியான பாதுகாப்பை வழங்குவதோடு, ஒரு வலுவான தொலைநோக்குப் பார்வையைத் தெளிவாக எடுத்துரைக்கும் திறனைப் பொறுத்தது.'
+                    }
+                }
+            },
+            'travel': {
+                beginner: {
+                    big: {
+                        title: 'The Thrilling Experience of Boarding an International Flight',
+                        badge: '🌱 Beginner · 📜 Big Sentences',
+                        est: '⏱️ ~2 min read · Click any word for Tamil meaning',
+                        en: 'Arriving at Chennai international airport several hours before departure, we marveled at the bustling terminal filled with globetrotters from diverse nations wheeling their luggage toward brightly illuminated check-in counters. After the polite airline agent verified our passports and handed us our stamped boarding passes with a pleasant smile, we proceeded through security clearance where officers efficiently scanned our hand baggage. Walking through the vibrant duty-free concourse toward our departure gate, the thrilling announcement echoed over the loudspeakers inviting passengers to board the aircraft. As we settled into our window seats and fastened our safety belts, looking out across the illuminated runway filled our hearts with immense excitement for the foreign lands awaiting us.',
+                        ta: 'விமானம் புறப்படுவதற்கு பல மணி நேரங்களுக்கு முன்பே சென்னை சர்வதேச விமான நிலையத்தை அடைந்த நாங்கள், பல நாடுகளிலிருந்தும் வந்த பயணிகள் தங்களின் பயணப் பெட்டிகளை உருட்டியபடி பிரகாசமான செக்-இன் கவுண்டர்களை நோக்கிச் செல்லும் பரபரப்பான காட்சியை வியப்புடன் பார்த்தோம். கண்ணியமான விமான நிறுவனப் பணியாளர் எங்கள் கடவுச்சீட்டுகளைச் சரிபார்த்து புன்னகையுடன் போர்டிங் பாஸ்களை வழங்கியதும், அதிகாரிகள் எங்கள் கைப் பைகளை விரைவாக ஸ்கேன் செய்த பாதுகாப்புப் பிரிவைக் கடந்து சென்றோம். வண்ணமயமான டியூட்டி-ஃப்ரீ பகுதியைக் கடந்து போர்டிங் கேட்டை நோக்கி நடந்தபோது, பயணிகள் விமானத்தில் ஏறுமாறு ஒலிபெருக்கியில் ஒலித்த உற்சாகமான அறிவிப்பு கேட்டது. நாங்கள் எங்கள் சாளர இருக்கைகளில் அமர்ந்து பாதுகாப்பு பெல்ட்டுகளை அணிந்துகொண்டு, விளக்குகளால் ஒளிரும் ஓடுபாதையைப் பார்த்தபோது, எங்களை வரவேற்கக் காத்திருக்கும் வெளிநாடுகளைப் பற்றிய அளவற்ற மகிழ்ச்சி எங்கள் இதயத்தை நிறைத்தது.'
+                    },
+                    short: {
+                        title: 'Boarding a Flight at the Airport',
+                        badge: '🌱 Beginner · Short Sentences',
+                        est: '⏱️ ~1 min read · Click any word for Tamil meaning',
+                        en: 'We arrived at Chennai airport two hours before departure. The security officer checked our identity card and boarding pass. Soon we boarded the aircraft and found our window seats comfortably.',
+                        ta: 'விமானம் புறப்படுவதற்கு இரண்டு மணி நேரத்திற்கு முன்பே நாங்கள் சென்னை விமான நிலையத்திற்கு வந்தடைந்தோம். பாதுகாப்பு அதிகாரி எங்கள் அடையாள அட்டையையும் போர்டிங் பாஸையும் சரிபார்த்தார்.'
+                    }
+                },
+                intermediate: {
+                    big: {
+                        title: 'A Journey Through the Architectural Splendors of Madurai',
+                        badge: '📚 Intermediate · 📜 Big Sentences',
+                        est: '⏱️ ~2 min read · Click any word for Tamil meaning',
+                        en: 'Exploring ancient heritage cities like Madurai offers travelers a deeply mesmerizing glimpse into monumental Dravidian architecture, sacred history, and enduring artistic traditions that have flourished for thousands of years. As you gaze upward at the colossal, multi-tiered gopurams of the historic Meenakshi Amman Temple, you are immediately captivated by thousands of intricately carved and vibrantly painted stone sculptures depicting legendary tales and celestial beings. Walking along the cool stone corridors of the Thousand Pillar Hall, the extraordinary craftsmanship of ancient master sculptors becomes apparent as sunlight filters through ornate pillars, creating an ethereal ambiance of spiritual serenity. Without question, immersing oneself in such timeless heritage not only awakens a profound appreciation for historic artistry, but also reminds us of the extraordinary engineering genius of our ancestors.',
+                        ta: 'மதுரை போன்ற பழமையான வரலாற்று நகரங்களில் பயணம் செய்வது ஆயிரக்கணக்கான ஆண்டுகளாகத் தழைத்தோங்கிய பிரம்மாண்டமான திராவிடக் கட்டிடக்கலை, புனித வரலாறு மற்றும் பாரம்பரியக் கலைகளைப் பற்றிய வியத்தகு காட்சியைப் பயணிகளுக்கு வழங்குகிறது. வரலாற்று சிறப்புமிக்க மீனாட்சி அம்மன் கோவிலின் பிரம்மாண்டமான பல அடுக்கு கோபுரங்களை அண்ணாந்து பார்க்கும்போது, புராணக் கதைகளையும் தேவதூதர்களையும் சித்தரிக்கும் ஆயிரக்கணக்கான நுணுக்கமாகச் செதுக்கப்பட்ட, வண்ணமயமான கல் சிற்பங்கள் உடனே மனதைக் கவர்கின்றன. ஆயிரம் கால் மண்டபத்தின் குளிர்ந்த கல் மண்டபங்களில் நடக்கும்போது, அலங்கரிக்கப்பட்ட தூண்களின் வழியே சூரிய ஒளி பாய்ந்து ஆன்மீக அமைதியின் தெய்வீகச் சூழலை உருவாக்குவதைக் காணும்போது பழங்கால சிற்பக் கலைஞர்களின் அபார கைத்திறன் தெளிவாகத் தெரிகிறது. இத்தகைய காலத்தால் அழியாத பாரம்பரியத்தில் நம்மை ஈடுபடுத்திக் கொள்வது வரலாற்று கலை மீதான ஆழ்ந்த மரியாதையைத் தூண்டுவதோடு மட்டுமல்லாமல், நமது முன்னோர்களின் வியக்கத்தக்க பொறியியல் அறிவையும் நினைவூட்டுகிறது.'
+                    },
+                    short: {
+                        title: 'Exploring the Heritage Temples of Madurai',
+                        badge: '📚 Intermediate · Short Sentences',
+                        est: '⏱️ ~1 min read · Click any word for Tamil meaning',
+                        en: 'Traveling through historic cities offers a mesmerizing glimpse into ancient architecture and vibrant cultural traditions. The towering gopurams of the Meenakshi temple showcase thousands of intricate stone sculptures carved centuries ago.',
+                        ta: 'வரலாற்று சிறப்புமிக்க நகரங்களில் பயணம் செய்வது பழங்கால கட்டிடக்கலை மற்றும் பாரம்பரிய கலாச்சாரத்தைப் பற்றிய வியக்கத்தக்க காட்சியை வழங்குகிறது.'
+                    }
+                },
+                advanced: {
+                    big: {
+                        title: 'The Transformative Wisdom of Global Exploration and Cultural Immersion',
+                        badge: '🚀 Advanced · 📜 Big Sentences',
+                        est: '⏱️ ~3 min read · Click any word for Tamil meaning',
+                        en: 'Traversing distant continents and immersing oneself in unfamiliar cultural landscapes inevitably expands intellectual horizons while systematically dismantling deeply entrenched regional prejudices. When an inquisitive traveler ventures beyond predictable tourist enclaves into remote ancestral villages, observing how distinct communities resolve ecological and societal challenges fosters a profound appreciation for human diversity. Furthermore, confronting linguistic barriers and navigating unforeseen transit obstacles sharpens adaptive resilience, emotional composure, and diplomatic problem-solving skills under stressful conditions. Ultimately, the true essence of transformative travel lies not merely in chronicling exotic destinations, but in returning home with a permanently refined perspective that cherishes our shared global humanity.',
+                        ta: 'தொலைதூரக் கண்டங்களில் பயணம் செய்து பழக்கமில்லாத கலாச்சார நிலப்பரப்புகளில் நம்மை முழுமையாக ஈடுபடுத்திக் கொள்வது, அறிவு எல்லைகளை விரிவுபடுத்துவதோடு குறுகிய மனப்பான்மையையும் தகர்த்தெறிகிறது. ஒரு ஆர்வமுள்ள பயணி வழக்கமான சுற்றுலா பகுதிகளைத் தாண்டி தொலைதூரக் கிராமங்களுக்குச் சென்று, வெவ்வேறு மக்கள் சுற்றுச்சூழல் மற்றும் சமூக சவால்களை எவ்வாறு எதிர்கொள்கிறார்கள் என்பதைக் கவனிக்கும் போது, அது மனித பன்முகத்தன்மை மீதான ஆழ்ந்த மதிப்பை உருவாக்குகிறது. மேலும், மொழித் தடைகளை எதிர்கொள்வதும் எதிர்பாராத பயணத் தடைகளைத் தாண்டுவதும் மன உறுதியையும், அமைதியையும், இக்கட்டான சூழ்நிலைகளில் பிரச்சினைகளைத் தீர்க்கும் சாதுரியத்தையும் கூர்மைப்படுத்துகிறது. இறுதியில், உண்மையான பயணத்தின் சாராம்சம் கவர்ச்சிகரமான இடங்களைப் பார்ப்பதில் மட்டுமல்ல; ஒட்டுமொத்த மனிதகுலத்தின் ஒற்றுமையை உணர்ந்து பக்குவப்பட்ட மனநிலையோடு வீடு திரும்புவதிலேயே உள்ளது.'
+                    },
+                    short: {
+                        title: 'Navigating Cross-Continental Expeditions',
+                        badge: '🚀 Advanced · Short Sentences',
+                        est: '⏱️ ~1 min read · Click any word for Tamil meaning',
+                        en: 'Traversing distant continents broadens intellectual horizons and dispels cultural parochialism. Adapting swiftly to unfamiliar customs and idioms cultivates an adaptable, cosmopolitan worldview.',
+                        ta: 'தொலைதூரக் கண்டங்களில் பயணம் செய்வது அறிவு எல்லைகளை விரிவுபடுத்துகிறது மற்றும் குறுகிய மனப்பான்மையை போக்குகிறது.'
+                    }
+                }
+            },
+            'story': {
+                beginner: {
+                    big: {
+                        title: 'The Honest Woodcutter and the River Guardian Spirit',
+                        badge: '🌱 Beginner · 📜 Big Sentences',
+                        est: '⏱️ ~2 min read · Click any word for Tamil meaning',
+                        en: 'While diligently chopping firewood near the bank of a swift mountain stream, an impoverished woodcutter accidentally slipped on the mossy stones, causing his sole iron axe to tumble into the deep, turbulent water. Devastated because the lost tool was the only source of livelihood for his beloved family, the humble laborer sat on the rocky riverbank and wept bitterly in helpless despair. Suddenly, the swirling waters parted and a benevolent golden-haired river guardian emerged, offering the weeping man a glittering golden axe followed by a magnificent silver axe, both of which he resolutely declined, insisting that his lost tool was merely ordinary iron. Profoundly touched by his unwavering integrity and moral courage, the pleased spirit not only retrieved his original humble tool, but joyfully gifted him both precious metal axes as an enduring reward for his unblemished truthfulness.',
+                        ta: 'ஒரு வேகமான மலை ஓடையின் கரையில் விறகு வெட்டிக் கொண்டிருந்த ஒரு ஏழை விறகுவெட்டி, பாசி பிடித்த பாறைகளில் தவறி விழுந்ததால், அவரது ஒரே இரும்புக் கோடரி ஆழமான ஆற்று நீரில் மூழ்கியது. தனது குடும்பத்தைக் காப்பாற்றும் ஒரே வாழ்வாதாரமான அந்தக் கருவியை இழந்துவிட்டதால் கலங்கிப்போன அந்த எளிய மனிதர் ஆற்றங்கரையில் அமர்ந்து மிகுந்த வேதனையுடன் அழுதார். திடீரென்று, சுழன்றோடும் நீர் விலகி ஒரு அழகான பொன்நிற நீர் தேவதை தோன்றி, அழுதவரிடம் மின்னும் தங்கக் கோடரியையும், பின்னர் ஒரு வெள்ளி கோடரியையும் காட்டியது; ஆனால் அந்த நேர்மையான மனிதன் தனது கருவி சாதாரண இரும்பு மட்டுமே என்று கூறி இரண்டையும் உறுதியாக மறுத்துவிட்டார். அவரது அசைக்க முடியாத நேர்மையையும் ஒழுக்கத்தையும் கண்டு உள்ளம் நெகிழ்ந்த தேவதை, அவரது பழைய இரும்புக் கோடரியை மீட்டுக் கொடுத்தது மட்டுமல்லாமல், அவரது உண்மையான நேர்மைக்குப் பரிசாக அந்த இரண்டு விலையுயர்ந்த கோடரிகளையும் அவருக்கே மகிழ்ச்சியுடன் அன்பளிப்பாக வழங்கியது.'
+                    },
+                    short: {
+                        title: 'The Honest Woodcutter',
+                        badge: '🌱 Beginner · Short Sentences',
+                        est: '⏱️ ~1 min read · Click any word for Tamil meaning',
+                        en: 'A poor woodcutter dropped his iron axe into a deep river. A water spirit appeared and offered him a golden axe, but the honest man refused to take it. Pleased by his truthfulness, the spirit rewarded him with both axes.',
+                        ta: 'ஓர் ஏழை விறகுவெட்டி தனது இரும்புக் கோடரியை ஆழமான ஆற்றில் தவறவிட்டார். நீர் தேவதை தோன்றி அவரிடம் ஒரு தங்கக் கோடரியைக் கொடுத்தது, ஆனால் அவர் மறுத்துவிட்டார். அவரது நேர்மையைக் கண்டு மகிழ்ந்த தேவதை இரண்டு கோடரிகளையும் பரிசாக அளித்தது.'
+                    }
+                },
+                intermediate: {
+                    big: {
+                        title: 'The Whispering Bamboo and the Unyielding Oak Tree',
+                        badge: '📚 Intermediate · 📜 Big Sentences',
+                        est: '⏱️ ~2 min read · Click any word for Tamil meaning',
+                        en: 'Standing proudly upon an exposed hilltop, an ancient, colossal oak tree continuously mocked the slender bamboo stalks growing below in the valley, ridiculing their delicate stems and fragile posture whenever a light breeze swept across the meadow. When an unprecedented hurricane struck the countryside with deafening fury, the rigid oak stubbornly dug its thick roots into the rocky soil, refusing to yield an inch to the ferocious gale until its massive trunk suddenly cracked under immense strain. In sharp contrast, the supple bamboo clusters bowed gracefully before the roaring tempest, swaying harmoniously with the howling winds without suffering even the slightest fracture. When dawn broke over the serene valley, the fallen giant lay shattered in the dust, while the resilient bamboo stood upright, offering all witnesses an unforgettable life lesson that adaptability constitutes far greater strength than rigid arrogance.',
+                        ta: 'ஒரு உயரமான மலை உச்சியில் கம்பீரமாக நின்ற பழமையான பெரிய ஓக் மரம், பள்ளத்தாக்கில் வளர்ந்த மெல்லிய மூங்கில் மரங்களை எப்போதும் ஏளனம் செய்தது; புல்வெளியில் லேசான காற்று வீசும் போதெல்லாம் அவற்றின் மெல்லிய தண்டுகளையும் வளையும் தன்மையையும் பார்த்து எள்ளி நகையாடியது. ஒருநாள் முன்னெப்போதும் இல்லாத கொடூரமான சூறாவளி காற்று காட்டைத் தாக்கிய போது, இறுக்கமான ஓக் மரம் தனது தடிமனான வேர்களால் பாறையைப் பற்றிப் பிடித்துக் கொண்டு, முரட்டுத்தனமாக நின்று இறுதியில் காற்றின் கடுமையான அழுத்தத்தால் வேரோடு முறிந்து விழுந்தது. ஆனால் நெகிழ்வான மூங்கில் கூட்டங்களோ சீறிப்பாய்ந்த புயலுக்கு ஏற்ப அழகாக வளைந்து கொடுத்து, ஒரு சிறு சேதமும் இன்றி காற்றுடன் இசைவாக ஆடி நின்றன. மறுநாள் விடியலில் புயல் ஓய்ந்தபோது, வீழ்ந்த பெரிய மரம் மண்ணில் சிதைந்து கிடந்தது; ஆனால் தலைநிமிர்ந்து நின்ற மூங்கில்கள், முரட்டுத்தனமான அகந்தையை விட நெகிழ்வுத்தன்மையே உண்மையான வலிமை என்ற மறக்க முடியாத வாழ்வியல் பாடத்தை அனைவருக்கும் உணர்த்தின.'
+                    },
+                    short: {
+                        title: 'The Bamboo and the Mighty Oak',
+                        badge: '📚 Intermediate · Short Sentences',
+                        est: '⏱️ ~1 min read · Click any word for Tamil meaning',
+                        en: 'During a violent hurricane, the rigid oak tree stood stubbornly against the gale until its trunk snapped. In contrast, the flexible bamboo bent gracefully with the wind and survived unscathed. Flexibility is often greater strength than brute resistance.',
+                        ta: 'ஒரு கடுமையான புயலின் போது, விறைப்பான ஓக் மரம் பிடிவாதமாக நின்று இறுதியில் முறிந்து விழுந்தது. ஆனால் நெகிழ்வான மூங்கில் காற்றுக்கு ஏற்ப அழகாக வளைந்து சேதமின்றி தப்பியது.'
+                    }
+                },
+                advanced: {
+                    big: {
+                        title: 'The Paradox of Fleeting Ambition and the Treasure of Simplicity',
+                        badge: '🚀 Advanced · 📜 Big Sentences',
+                        est: '⏱️ ~3 min read · Click any word for Tamil meaning',
+                        en: 'In our relentless societal obsession with accumulating extrinsic accolades, financial dominion, and transient prestige, individuals frequently forfeit the tranquil serenity that blossoms within conscious simplicity and genuine self-awareness. Mesmerized by the intoxicating illusion that forthcoming accomplishments will finally bestow lasting gratification, ambitious strivers perpetually postpone their happiness, failing to realize that each milestone merely introduces new burdens of anxiety. When philosophical introspection prompts us to disentangle our self-worth from ephemeral status symbols, we instantly unlock an inexhaustible reservoir of inner contentment that external volatility cannot diminish. Consequently, genuine wisdom consists not in the insatiable pursuit of excess, but in the contemplative appreciation of life’s unadorned blessings unfolding here in this precious, ephemeral present.',
+                        ta: 'வெளிப்புறப் புகழையும், செல்வ ஆதிக்கத்தையும், தற்காலிக கௌரவத்தையும் குவிப்பதில் வெறித்தனமாக இயங்கும் சமூகம், எளிமையிலும் சுய விழிப்புணர்விலும் மலரும் அமைதியை அடிக்கடி இழந்துவிடுகிறது. எதிர்கால சாதனைகள் மட்டுமே உண்மையான மகிழ்ச்சியைத் தரும் என்ற மாயையில் மயங்கி, லட்சியவாதிகள் தங்கள் நிகழ்கால அமைதியைத் தள்ளிப்போடுகிறார்கள்; ஆனால் ஒவ்வொரு மைல்கல்லும் புதிய கவலைகளை மட்டுமே உருவாக்குகிறது என்பதை அவர்கள் உணர்வதில்லை. தத்துவார்த்த சுயபரிசோதனை நமது சுயமதிப்பை ஆடம்பர மாயைகளிலிருந்து விடுவிக்கும் போது, வெளிப்புற மாற்றங்களால் அழிக்க முடியாத எல்லையற்ற மன அமைதியை நாம் உடனடியாகப் பெறுகிறோம். எனவே, உண்மையான ஞானம் என்பது முடிவில்லாத பேராசையில் இல்லை; மாறாக இந்த அருமையான நிகழ்கணத்தில் நம்மைச் சுற்றியுள்ள எளிய ஆசீர்வாதங்களை உணர்ந்து மனநிறைவோடு வாழ்வதிலேயே உள்ளது.'
+                    },
+                    short: {
+                        title: 'The Paradox of Fleeting Ambition',
+                        badge: '🚀 Advanced · Short Sentences',
+                        est: '⏱️ ~1 min read · Click any word for Tamil meaning',
+                        en: 'In our relentless pursuit of extrinsic accolades, we frequently overlook the profound tranquility inherent in simplicity. True contentment is seldom derived from perpetual accumulation, but rather from the discerning appreciation of the present moment.',
+                        ta: 'வெளிப்புறப் புகழையும் பாராட்டுகளையும் வெறித்தனமாகத் துரத்தும் நாம், எளிமையில் உள்ள ஆழ்ந்த அமைதியை அடிக்கடி தவறவிடுகிறோம். உண்மையான மனநிறைவு என்பது முடிவில்லாமல் குவிப்பதில் வருவதில்லை.'
+                    }
+                }
+            },
+            'tamil-culture': {
+                beginner: {
+                    big: {
+                        title: 'The Rich Traditions and Heartwarming Spirit of Pongal',
+                        badge: '🌱 Beginner · 📜 Big Sentences',
+                        est: '⏱️ ~2 min read · Click any word for Tamil meaning',
+                        en: 'Celebrated with boundless joy across the vibrant landscape of Tamil Nadu, the grand festival of Pongal marks an auspicious harvest season where grateful people offer heartfelt thanksgiving to nature, the Sun God, and diligent farm animals. Before early daybreak, women artfully decorate village courtyards with colorful rice flour kolams, while families assemble around new clay pots decorated with fresh turmeric and ginger sprigs to boil newly harvested sweet rice. As the fragrant mixture of jaggery, milk, and rice bubbles over the rim of the pot, cheerful shouts of "Pongalo Pongal" resound across neighborhoods, symbolizing prosperity, health, and endless blessings for the coming year. Beyond the delicious feast shared with cherished neighbors, this time-honored celebration reinforces our sacred connection with mother earth and pays tribute to the tireless farmers who feed our communities.',
+                        ta: 'தமிழ்நாட்டின் பசுமையான கிராமங்களிலும் நகரங்களிலும் மிகுந்த உற்சாகத்துடன் கொண்டாடப்படும் பொங்கல் திருவிழா, இயற்கைக்கும், கதிரவனுக்கும், கால்நடைகளுக்கும் மக்கள் தங்களின் மனமார்ந்த நன்றியைச் செலுத்தும் உன்னதமான அறுவடைத் திருநாளாகும். விடியற்காலையிலேயே பெண்கள் வீட்டு வாசல்களில் வண்ண அரிசி மாவு கோலங்களால் அலங்கரிக்க, புதிய மண்பானையில் மஞ்சள், இஞ்சி கொத்துகள் கட்டி புது நெல் அரிசியுடன் சர்க்கரைப் பொங்கல் வைக்க குடும்பங்கள் ஒன்று கூடுகின்றன. பானையிலிருந்து பால் பொங்கி வழியும் போது, குடும்பத்தினர் அனைவரும் "பொங்கலோ பொங்கல்" என்று மகிழ்ச்சியுடன் முழக்கமிடுவது, வரவிருக்கும் ஆண்டிற்கான செழிப்பு, ஆரோக்கியம் மற்றும் ஆசீர்வாதங்களின் அடையாளமாக விளங்குகிறது. சுவையான பொங்கலை அண்டை வீட்டாருடன் பகிர்ந்து உண்பதைத் தாண்டி, இந்தப் பாரம்பரியத் திருவிழா பூமித்தாயுடனான நமது புனித உறவை உறுதிப்படுத்துவதோடு, நமக்கு உணவளிக்கும் உழவர்களின் கடின உழைப்பையும் போற்றுகிறது.'
+                    },
+                    short: {
+                        title: 'Pongal Festival of Harvest',
+                        badge: '🌱 Beginner · Short Sentences',
+                        est: '⏱️ ~1 min read · Click any word for Tamil meaning',
+                        en: 'Pongal is the grand harvest festival celebrated across Tamil Nadu. People cook sweet rice in a clay pot and thank the Sun God and farmers for their hard work and abundance.',
+                        ta: 'பொங்கல் என்பது தமிழ்நாடு முழுவதும் கொண்டாடப்படும் அறுவடைத் திருவிழா ஆகும். மக்கள் மண்பானையில் சர்க்கரைப் பொங்கல் சமைத்து, சூரிய பகவானுக்கும் உழவர்களுக்கும் நன்றி செலுத்துகிறார்கள்.'
+                    }
+                },
+                intermediate: {
+                    big: {
+                        title: 'The Mesmerizing Melodies of the Margazhi Music Festival in Chennai',
+                        badge: '📚 Intermediate · 📜 Big Sentences',
+                        est: '⏱️ ~2 min read · Click any word for Tamil meaning',
+                        en: 'During the cool, misty month of Margazhi, Chennai metamorphoses into the undisputed global epicenter of classical South Indian music and sacred devotion, drawing thousands of passionate connoisseurs and virtuoso artists from around the world. As morning temple processions echo with melodious Thiruppavai verses along Mylapore streets, prestigious cultural sabhas throw open their doors to host spellbinding vocal recitals and dynamic Bharatanatyam performances that stretch well into the evening. Concurrently, legendary canteen kitchens adjacent to these auditoriums serve piping-hot tiffin delicacies such as crispy vadas and fragrant filter coffee, generating a delightful sensory festival where sublime melody and culinary mastery merge effortlessly. In essence, attending this month-long cultural extravaganza not only enriches musical appreciation, but also provides a living testimony to the timeless heritage cherished across generations.',
+                        ta: 'மார்கழி மாதத்தின் பனி படர்ந்த குளிர்ந்த நாட்களில், சென்னை நகரம் தென்னிந்திய பாரம்பரிய இசை மற்றும் பக்தி கலைகளின் சர்வதேசத் தலைநகராக உருவெடுத்து, உலகெங்கிலும் உள்ள ஆயிரக்கணக்கான இசை ஆர்வலர்களையும் முன்னணி கலைஞர்களையும் ஈர்க்கிறது. மயிலாப்பூர் கோவில் வீதிகளில் அதிகாலை திருப்பாவை பாசுரங்கள் இனிமையாக எதிரொலிக்க, வரலாற்று சிறப்புமிக்க சங்கீத சபாக்களில் மாலை வரை தொடரும் மயக்கும் குரலிசை மற்றும் பரதநாட்டிய நிகழ்ச்சிகள் அரங்கேறுகின்றன. அதே சமயம், சபாக்களின் உணவகங்களில் பரிமாறப்படும் மொறுமொறுப்பான வடை, சுவையான அசோகா அல்வா மற்றும் சூடான ஃபில்டர் காபி ஆகியவை இசை ரசனையோடு சுவை விருந்தையும் இணைக்கும் ஓர் அற்புத அனுபவத்தைத் தருகின்றன. சுருக்கமாகச் சொன்னால், இந்த மார்கழி இசைத் திருவிழாவில் பங்கேற்பது இசை அறிவை மேம்படுத்துவதோடு மட்டுமல்லாமல், தலைமுறை தலைமுறையாகப் போற்றப்படும் தமிழ் கலாச்சாரப் பெருமையின் வாழும் சான்றாகவும் திகழ்கிறது.'
+                    },
+                    short: {
+                        title: 'The Melodies of Margazhi and Chennai Music',
+                        badge: '📚 Intermediate · Short Sentences',
+                        est: '⏱️ ~1 min read · Click any word for Tamil meaning',
+                        en: 'During the cool month of Margazhi, Chennai transforms into the global capital of Carnatic music and classical dance. Early morning bhajans echo through temple streets while sabhas host thousands of avid connoisseurs from around the globe.',
+                        ta: 'மார்கழி மாதக் குளிர் காலத்தில் சென்னை நகரம் கர்நாடக இசை மற்றும் பரதநாட்டியத்தின் உலகத் தலைநகராக மாறுகிறது. சபாக்களில் உலகெங்கிலும் இருந்து வரும் ஆயிரக்கணக்கான இசை ஆர்வலர்கள் கூடுகிறார்கள்.'
+                    }
+                },
+                advanced: {
+                    big: {
+                        title: 'The Linguistic Grandeur and Ethical Wisdom of Classical Tamil Literature',
+                        badge: '🚀 Advanced · 📜 Big Sentences',
+                        est: '⏱️ ~3 min read · Click any word for Tamil meaning',
+                        en: 'Endowed with unparalleled antiquity, rigorous phonetic precision, and an astonishingly rich poetic corpus, classical Tamil represents one of humanity’s most monumental intellectual and philosophical treasures. From the passionate love and heroic warfare chronicles immortalized in ancient Sangam anthologies to the profound moral aphorisms distilled in Thiruvalluvar’s timeless Tirukkural, this venerable tongue synthesizes universal humanism with extraordinary poetic economy. Furthermore, unlike numerous archaic classical languages that ceased evolving and vanished into historical obscurity, Tamil has continuously adapted across centuries, thriving as a vibrant medium for cutting-edge digital discourse and global diplomacy. Thus, safeguarding and mastering this majestic literary heritage not only honors our civilizational roots, but also equips modern thinkers with an enduring ethical compass.',
+                        ta: 'இணையற்ற தொன்மை, துல்லியமான ஒலிப்பு முறை மற்றும் அளப்பரிய கவிதை வளத்தைக் கொண்ட செம்மொழித் தமிழ், மனிதகுலத்தின் மிக உன்னதமான அறிவு மற்றும் தத்துவச் செல்வங்களில் ஒன்றாக விளங்குகிறது. சங்க இலக்கியங்களில் பதிவு செய்யப்பட்டுள்ள வீரம் மற்றும் காதல் வாழ்வியல் பதிவுகள் முதல், திருவள்ளுவரின் உலகப் பொதுமறையான திருக்குறளில் கூறப்பட்டுள்ள உலகளாவிய அறநெறிகள் வரை, இந்த தாய்மொழி மனிதநேயத்தை வியக்கத்தக்க சுருக்கத்தோடு விளக்குகிறது. மேலும், பல வரலாற்றுச் சிறப்புமிக்க பழங்கால மொழிகள் காலப்போக்கில் வழக்கற்றுப் போன நிலையில், தமிழ் மொழி நூற்றாண்டுகளைக் கடந்து நவீன டிஜிட்டல் களத்திலும் உலகளாவிய தளத்திலும் கம்பீரமாகத் தழைத்தோங்கி வருகிறது. எனவே, இந்த கம்பீரமான இலக்கிய மரபைப் போற்றுவதும் கற்பதும் நமது வரலாற்று வேர்களைக் கொண்டாடுவதோடு மட்டுமல்லாமல், நவீன தலைமுறைக்கு அழியாத வாழ்வியல் வழிகாட்டியாகவும் திகழ்கிறது.'
+                    },
+                    short: {
+                        title: 'The Timeless Legacy of Classical Tamil',
+                        badge: '🚀 Advanced · Short Sentences',
+                        est: '⏱️ ~1 min read · Click any word for Tamil meaning',
+                        en: 'Endowed with unparalleled antiquity and profound philosophical richness, classical Tamil literature stands as an enduring monument to human introspection. The aphorisms of Tirukkural synthesize universal ethics with astonishing conciseness.',
+                        ta: 'இணையற்ற தொன்மையும் ஆழ்ந்த தத்துவ வளமும் கொண்ட செம்மொழித் தமிழ் இலக்கியம் மனித சிந்தனையின் அழியாத நினைவுச்சின்னமாக விளங்குகிறது.'
+                    }
+                }
+            },
+            'restaurant': {
+                beginner: {
+                    big: {
+                        title: 'An Evening Feast at a Traditional South Indian Tiffin Shop',
+                        badge: '🌱 Beginner · 📜 Big Sentences',
+                        est: '⏱️ ~2 min read · Click any word for Tamil meaning',
+                        en: 'Stepping into a brightly lit traditional south Indian vegetarian restaurant for evening tiffin, our senses were immediately greeted by the sizzling sound of hot iron tawa griddles and the mouthwatering smell of pure melting ghee. The courteous waiter promptly laid down fresh green banana leaves and skillfully served a golden, paper-thin ghee roast dosa alongside bowls of spicy piping-hot sambar and three distinct colorful chutneys. As we dipped each delicate, crispy piece into the creamy coconut chutney and tangy tomato gravy, every single bite burst with rich authentic spices that produced pure culinary satisfaction. Finishing the delightful meal with a frothy tumbler of authentic degree filter coffee, we left the lively eatery feeling thoroughly rejuvenated, already looking forward to our next visit.',
+                        ta: 'மாலை நேர சிற்றுண்டிக்காக ஒரு பாரம்பரிய தென்னிந்திய சைவ உணவகத்திற்குள் நுழைந்தபோது, சூடான தோசைக் கல்லில் தோசை சுடும் சத்தமும், உருகும் நெய்யின் நாவில் நீர் ஊறவைக்கும் வாசனையும் எங்கள் உணர்வுகளை உடனடியாக வரவேற்றன. மரியாதையான பணியாளர் எங்கள் முன் புதிய வாழை இலைகளை விரித்து, தங்க நிறத்தில் மொறுமொறுப்பான நெய் ரோஸ்ட் தோசையுடன் சுடச்சுட சாம்பாரையும் மூன்று வகையான வண்ணமயமான சட்னிகளையும் திறமையாகப் பரிமாறினார். அந்த மொறுமொறுப்பான தோசையைத் தேங்காய் சட்னியிலும் தக்காளி சாம்பாரிலும் தொட்டுச் சுவைத்தபோது, ஒவ்வொரு கவளமும் பாரம்பரிய மசாலாக்களின் சுவையோடு அலாதியான திருப்தியை அளித்தது. இந்த இனிய விருந்தை நுரைபொங்கும் சுவையான டிகிரி ஃபில்டர் காபியுடன் நிறைவு செய்துவிட்டு, அடுத்த முறை எப்போது வரலாம் என்ற ஆவலோடு நாங்கள் மகிழ்ச்சியாகப் புறப்பட்டோம்.'
+                    },
+                    short: {
+                        title: 'Crispy Dosa at the Tiffin Shop',
+                        badge: '🌱 Beginner · Short Sentences',
+                        est: '⏱️ ~1 min read · Click any word for Tamil meaning',
+                        en: 'We visited a popular south Indian restaurant for evening tiffin. The waiter served golden crispy ghee roast dosa with three flavorful chutneys and piping hot sambar. Every bite was heavenly.',
+                        ta: 'மாலை நேர சிற்றுண்டிக்காக நாங்கள் ஒரு பிரபலமான தென்னிந்திய உணவகத்திற்குச் சென்றோம். பணியாளர் தங்க நிறத்தில் மொறுமொறுப்பான நெய் ரோஸ்ட் தோசையுடன் மூன்று சுவையான சட்னிகளையும் சூடான சாம்பாரையும் பரிமாறினார்.'
+                    }
+                },
+                intermediate: {
+                    big: {
+                        title: 'The Irresistible Aromas of Heritage Seeraga Samba Biryani',
+                        badge: '📚 Intermediate · 📜 Big Sentences',
+                        est: '⏱️ ~2 min read · Click any word for Tamil meaning',
+                        en: 'Gathering around a rustic wooden table inside a famous century-old family restaurant, the tantalizing fragrance of slow-cooked dum biryani prepared with aromatic seeraga samba rice, fresh mint leaves, and tender spices immediately stirred our deepest appetites. When the grand brass platter was unveiled before us with gentle steam rising into the air, the glistening rice grains infused with rich caramelized shallots and authentic ghee looked utterly magnificent. Paired with cooling onion raita and rich, tangy brinjal gravy, every mouthful offered an exquisite symphony of layered flavors that showcased generations of secret culinary craftsmanship. Sharing such a memorable, indulgent feast with cheerful companions not only satiates hunger, but also creates indelible memories of warmth and joyous togetherness.',
+                        ta: 'நூற்றாண்டு பழமையான புகழ்பெற்ற பாரம்பரிய உணவகத்தில் ஒரு மர மேசையைச் சுற்றி அமர்ந்தபோது, சீரக சம்பா அரிசி, புதினா இலைகள் மற்றும் வாசனை மசாலாப் பொருட்களுடன் தம்மில் வெந்த பிரியாணியின் மனம் கவரும் வாசனை எங்கள் பசியை உடனடியாகத் தூண்டியது. மெல்லிய ஆவி பறக்க பிரம்மாண்டமான பித்தளைத் தட்டு எங்கள் முன் திறக்கப்பட்டபோது, நெய்யிலும் வதக்கிய சின்ன வெங்காயத்திலும் பளபளத்த சாதம் பார்ப்பதற்கே பிரமிப்பூட்டுவதாக இருந்தது. குளிர்ந்த வெங்காயத் தயிர்ப்பச்சடி மற்றும் காரசாரமான கத்திரிக்காய் தால்ச்சாவுடன் சேர்த்துச் சுவைத்தபோது, ஒவ்வொரு கவளமும் தலைமுறைகளாகப் பாதுகாக்கப்பட்ட சமையல் கைவண்ணத்தின் சுவையை அற்புதம் காட்டியது. இத்தகைய மறக்க முடியாத சுவையான உணவை அன்பான நண்பர்களோடு பகிர்ந்து உண்பது பசியைப் போக்குவதோடு மட்டுமல்லாமல், நெஞ்சில் என்றும் நிலைத்து நிற்கும் இனிய நினைவுகளையும் உருவாக்குகிறது.'
+                    },
+                    short: {
+                        title: 'The Vibrant Flavors of Traditional Biryani',
+                        badge: '📚 Intermediate · Short Sentences',
+                        est: '⏱️ ~1 min read · Click any word for Tamil meaning',
+                        en: 'Seated at a bustling heritage eatery, the aromatic fragrance of seeraga samba biryani infused with fresh mint and delicate spices immediately stimulated our appetite. Sharing a rich feast with family creates lasting joy.',
+                        ta: 'பரபரப்பான பாரம்பரிய உணவகத்தில் அமர்ந்ததும், சீரக சம்பா அரிசியில் புதினா மற்றும் நறுமண மசாலா சேர்த்து சமைக்கப்பட்ட பிரியாணியின் வாசனை உடனே நாவில் எச்சில் ஊற வைத்தது.'
+                    }
+                },
+                advanced: {
+                    big: {
+                        title: 'Gastronomy as an Expression of Cultural Heritage and Holistic Philosophy',
+                        badge: '🚀 Advanced · 📜 Big Sentences',
+                        est: '⏱️ ~3 min read · Click any word for Tamil meaning',
+                        en: 'Indigenous culinary traditions encapsulate centuries of agrarian ingenuity, climatic adaptation, and holistic medical philosophy, transforming ordinary sustenance into a sophisticated art of community wellness. In traditional South Indian gastronomy, the deliberate orchestration of the six fundamental tastes—sweet, sour, salty, bitter, pungent, and astringent—reflects an ancient understanding of digestive equilibrium and seasonal vitality. When contemporary food historians analyze the meticulous fermentation of rice batters or the medicinal deployment of black pepper and turmeric, they uncover profound scientific wisdom passed down through generations. Consequently, preserving authentic regional cuisine transcends mere culinary nostalgia, serving instead as an essential defense against industrialized uniformity and a celebration of biocultural identity.',
+                        ta: 'பாரம்பரிய உணவு முறைகள் என்பது பல நூற்றாண்டுகால விவசாய நுண்ணறிவு, பருவநிலை மாற்றங்களுக்கான ஏற்பாடுகள் மற்றும் முழுமையான மருத்துவத் தத்துவத்தின் சாரமாகும்; இது சாதாரண உணவை ஆரோக்கியத்திற்கான ஒரு கலை வடிவமாக மாற்றுகிறது. தென்னிந்திய உணவு மரபில் அறுசுவைகளான இனிப்பு, புளிப்பு, உப்பு, கசப்பு, காரம் மற்றும் துவர்ப்பு ஆகியவற்றை நுணுக்கமாக இணைக்கும் முறை செரிமான சமநிலை மற்றும் உடல் நலம் பற்றிய பழங்கால அறிவைப் பிரதிபலிக்கிறது. பாரம்பரிய தானியங்களை நொதிக்க வைக்கும் முறையையும், மிளகு, மஞ்சள் போன்ற மருத்துவப் பொருட்களின் பயன்பாட்டையும் நவீன ஆய்வாளர்கள் ஆராயும்போது, தலைமுறைகளாகக் கடத்தப்பட்ட ஆழ்ந்த அறிவியல் உண்மைகளை அவர்கள் காண்கிறார்கள். எனவே, நமது பாரம்பரிய உணவுப் பழக்கங்களைப் பாதுகாப்பது என்பது வெறும் கடந்த கால ஏக்கம் மட்டுமல்ல; நவீன பாக்கெட் உணவுகளின் தீமைகளிலிருந்து நம்மைப் பாதுகாக்கும் ஓர் அத்தியாவசிய கலாச்சாரக் கடமையாகும்.'
+                    },
+                    short: {
+                        title: 'Gastronomy as an Expression of Heritage',
+                        badge: '🚀 Advanced · Short Sentences',
+                        est: '⏱️ ~1 min read · Click any word for Tamil meaning',
+                        en: 'Culinary traditions encapsulate centuries of agrarian history, indigenous wisdom, and climatic adaptation. The meticulous orchestration of astringent, savory, and sweet flavors mirrors holistic wellness philosophy.',
+                        ta: 'உணவுப் பாரம்பரியம் என்பது பல நூற்றாண்டுகால விவசாய வரலாறு, பூர்வகுடி அறிவு மற்றும் தட்பவெப்பநிலை மாற்றங்களின் சாரமாகும். அறுசுவைகளையும் நுணுக்கமாக இணைக்கும் முறை முழுமையான ஆரோக்கிய தத்துவத்தைப் பிரதிபலிக்கிறது.'
+                    }
+                }
+            }
+        },
+
+        init() {
+            readingManager.loadPassage(state.readingTopic, state.readingDifficulty);
+
+            dom.readingTopicChips.forEach(chip => {
+                chip.addEventListener('click', () => {
+                    dom.readingTopicChips.forEach(c => c.classList.remove('active'));
+                    chip.classList.add('active');
+                    state.readingTopic = chip.dataset.topic;
+                    readingManager.loadPassage(state.readingTopic, state.readingDifficulty);
+                });
+            });
+
+            dom.readingDiffPills.forEach(pill => {
+                pill.addEventListener('click', () => {
+                    dom.readingDiffPills.forEach(p => p.classList.remove('active'));
+                    pill.classList.add('active');
+                    state.readingDifficulty = pill.dataset.rdiff;
+                    readingManager.loadPassage(state.readingTopic, state.readingDifficulty);
+                });
+            });
+
+            if (dom.readingLengthPills) {
+                dom.readingLengthPills.forEach(pill => {
+                    pill.addEventListener('click', () => {
+                        dom.readingLengthPills.forEach(p => p.classList.remove('active'));
+                        pill.classList.add('active');
+                        state.readingLength = pill.dataset.rlength;
+                        readingManager.loadPassage(state.readingTopic, state.readingDifficulty);
+                    });
+                });
+            }
+
+            if (dom.aiGenerateReadingBtn) {
+                dom.aiGenerateReadingBtn.addEventListener('click', () => {
+                    readingManager.generateAIStory();
+                });
+            }
+
+            if (dom.readerSpeakEnBtn) {
+                dom.readerSpeakEnBtn.addEventListener('click', () => {
+                    if (state.readingPassage) {
+                        voiceManager.speakEnglish(state.readingPassage.en);
+                    }
+                });
+            }
+
+            if (dom.readerRecordBtn) {
+                dom.readerRecordBtn.addEventListener('click', () => {
+                    readingManager.toggleSpeechTest();
+                });
+            }
+
+            if (dom.readerTamilToggle) {
+                dom.readerTamilToggle.addEventListener('click', () => {
+                    const isHidden = dom.readerTamilContent.classList.contains('hidden');
+                    dom.readerTamilContent.classList.toggle('hidden', !isHidden);
+                    dom.readerTamilArrow.textContent = isHidden ? '▲' : '▼';
+                });
+            }
+        },
+
+        loadPassage(topic, diff) {
+            const topicGroup = readingManager.passages[topic] || readingManager.passages['daily-life'];
+            const diffGroup = topicGroup[diff] || topicGroup['beginner'];
+            const lengthMode = state.readingLength || 'big';
+            let passage = null;
+            if (diffGroup[lengthMode]) {
+                passage = diffGroup[lengthMode];
+            } else if (diffGroup.big) {
+                passage = diffGroup.big;
+            } else {
+                passage = diffGroup;
+            }
+            state.readingPassage = passage;
+            readingManager.renderPassage(passage);
+        },
+
+        renderPassage(passage) {
+            if (!dom.readerTitle) return;
+            dom.readerTitle.textContent = passage.title;
+            dom.readerBadge.textContent = passage.badge;
+            dom.readerEst.textContent = passage.est;
+            dom.readerTamilContent.textContent = passage.ta;
+            dom.readerFeedbackCard.classList.add('hidden');
+
+            const words = passage.en.split(/\s+/);
+            dom.readerPassageBox.innerHTML = words.map(w => {
+                const clean = w.replace(/[^a-zA-Z]/g, '');
+                return `<span class="clickable-word" data-word="${chatManager.escapeHtml(clean)}">${chatManager.escapeHtml(w)}</span>`;
+            }).join(' ');
+
+            dom.readerPassageBox.querySelectorAll('.clickable-word').forEach(span => {
+                span.addEventListener('click', () => {
+                    const word = span.dataset.word;
+                    voiceManager.speakEnglish(word);
+                    const dict = wordsManager.getDictionaryEntry(word);
+                    if (dict) {
+                        span.title = `${dict.word}: ${dict.tamilMeaning}`;
+                        span.classList.add('active-spoken');
+                        setTimeout(() => span.classList.remove('active-spoken'), 1200);
+                    }
+                });
+            });
+        },
+
+        async generateAIStory() {
+            if (!dom.aiGenerateReadingBtn) return;
+            const isBig = state.readingLength === 'big';
+            dom.aiGenerateReadingBtn.disabled = true;
+            dom.aiGenerateReadingBtn.textContent = isBig ? 'Generating Big Sentences...' : 'Generating with AI...';
+
+            const prompt = `Write an engaging English reading practice story or passage on topic "${state.readingTopic}" with difficulty level "${state.readingDifficulty}".
+Mode: ${isBig ? 'BIG SENTENCES & COMPREHENSIVE PARAGRAPH' : 'SHORT SENTENCES'}.
+${isBig 
+  ? 'CRITICAL REQUIREMENT: Generate 4 to 6 substantial, rich, well-crafted BIG sentences (25 to 40 words per individual sentence) connected naturally with transition words (such as furthermore, consequently, while, although, not only... but also). Total Length: 125 to 180 words. DO NOT write short sentences.' 
+  : 'Generate 3 to 4 short, simple, easy-to-read sentences (40 to 60 words total).'}
+Ensure natural everyday spoken English suitable for Tamil speakers practicing fluency and pronunciation.
+Provide a complete, natural, accurate Tamil translation for the entire passage.
+Respond ONLY as a valid JSON object formatted as:
+{
+  "title": "Story Title",
+  "badge": "${state.readingDifficulty === 'advanced' ? '🚀 Advanced' : state.readingDifficulty === 'intermediate' ? '📚 Intermediate' : '🌱 Beginner'} · ${isBig ? '📜 Big Sentences' : '🌱 Short'}",
+  "est": "⏱️ ~2 min read · Click any word for Tamil meaning",
+  "en": "English passage text...",
+  "ta": "முழுமையான தமிழ் மொழிபெயர்ப்பு..."
+}`;
+
+            try {
+                const res = await aiEngine.generateReply(prompt);
+                let match = res.match(/\{[\s\S]*\}/);
+                if (match) {
+                    const passageObj = JSON.parse(match[0]);
+                    if (passageObj.en && passageObj.ta) {
+                        state.readingPassage = passageObj;
+                        readingManager.renderPassage(passageObj);
+                        return;
+                    }
+                }
+            } catch (err) {
+                console.warn('AI Story gen error:', err);
+            } finally {
+                dom.aiGenerateReadingBtn.disabled = false;
+                dom.aiGenerateReadingBtn.textContent = '✨ AI Generate Big Story (AI கதை உருவாக்குக)';
+            }
+        },
+
+        toggleSpeechTest() {
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            if (!SpeechRecognition) {
+                alert('Speech recognition is not supported in this browser. Please use Chrome or Edge.');
+                return;
+            }
+
+            if (state.isReadingRecording) {
+                if (state.readingRec) state.readingRec.stop();
+                return;
+            }
+
+            voiceManager.stopSpeech();
+            const rec = new SpeechRecognition();
+            rec.lang = 'en-US';
+            rec.continuous = true;
+            rec.interimResults = true;
+
+            state.isReadingRecording = true;
+            dom.readerRecordBtn.classList.add('recording');
+            dom.readerRecordText.textContent = '⏹️ Stop Reading & Evaluate (நிறுத்தி மதிப்பிடவும்)';
+            dom.readerRecStatus.classList.remove('hidden');
+
+            let spokenTranscript = '';
+
+            rec.onresult = (e) => {
+                spokenTranscript = '';
+                for (let i = 0; i < e.results.length; i++) {
+                    spokenTranscript += e.results[i][0].transcript + ' ';
+                }
+            };
+
+            rec.onend = () => {
+                state.isReadingRecording = false;
+                dom.readerRecordBtn.classList.remove('recording');
+                dom.readerRecordText.textContent = '🎙️ Read Aloud & Test Speech (படித்துப் பேசிப் பார்க்க)';
+                dom.readerRecStatus.classList.add('hidden');
+                readingManager.evaluateReading(spokenTranscript.trim());
+            };
+
+            rec.onerror = (e) => {
+                state.isReadingRecording = false;
+                dom.readerRecordBtn.classList.remove('recording');
+                dom.readerRecordText.textContent = '🎙️ Read Aloud & Test Speech (படித்துப் பேசிப் பார்க்க)';
+                dom.readerRecStatus.classList.add('hidden');
+                console.warn('Reading rec error:', e.error);
+            };
+
+            state.readingRec = rec;
+            rec.start();
+        },
+
+        evaluateReading(spokenText) {
+            if (!spokenText || !state.readingPassage) return;
+
+            const targetWords = state.readingPassage.en.toLowerCase().replace(/[^a-z\s]/g, '').split(/\s+/).filter(Boolean);
+            const spokenWords = spokenText.toLowerCase().replace(/[^a-z\s]/g, '').split(/\s+/).filter(Boolean);
+
+            let matchedCount = 0;
+            const spokenSet = new Set(spokenWords);
+
+            const spans = dom.readerPassageBox.querySelectorAll('.clickable-word');
+            spans.forEach(span => {
+                const wordClean = span.dataset.word.toLowerCase();
+                if (spokenSet.has(wordClean)) {
+                    span.className = 'clickable-word correct-word';
+                    matchedCount++;
+                } else {
+                    span.className = 'clickable-word missed-word';
+                }
+            });
+
+            const accuracy = Math.min(100, Math.round((matchedCount / targetWords.length) * 100));
+
+            dom.readerFeedbackCard.classList.remove('hidden');
+            dom.readerScoreVal.textContent = `${accuracy}%`;
+
+            if (accuracy >= 80) {
+                dom.readerFeedbackTitle.textContent = "Outstanding Pronunciation! 🎉";
+                dom.readerFeedbackTa.textContent = `அற்புதம்! ${accuracy}% துல்லியமாக வாசித்துள்ளீர்கள். உங்கள் ஆங்கில உச்சரிப்பு மிக அருமையாக உள்ளது!`;
+                state.vocabScore += 25;
+            } else if (accuracy >= 50) {
+                dom.readerFeedbackTitle.textContent = "Good Reading Effort! 👍";
+                dom.readerFeedbackTa.textContent = `நல்ல முயற்சி! ${accuracy}% துல்லியமாக உள்ளது. சிவப்பு நிறத்தில் உள்ள வார்த்தைகளை '🔊 Listen English' மூலம் கேட்டு மீண்டும் முயலுங்கள்.`;
+                state.vocabScore += 10;
+            } else {
+                dom.readerFeedbackTitle.textContent = "Keep Practicing! 🌱";
+                dom.readerFeedbackTa.textContent = `தொடர்ந்து பழகுங்கள். ஒவ்வொரு வார்த்தையையும் அழுத்தி அதன் உச்சரிப்பைக் கேட்டுப் பேசிப் பாருங்கள்.`;
+                state.vocabScore += 5;
+            }
+
+            localStorage.setItem('sw_vocab_score', state.vocabScore);
+            dom.vocabScoreBadge.textContent = `Score: ${state.vocabScore}`;
+            if (window.authManager) {
+                authManager.saveUserProgress({
+                    vocabScore: state.vocabScore,
+                    lastReadingScore: accuracy
+                });
+            }
+            if (window.learningProgressManager) {
+                learningProgressManager.recordReadingTest(accuracy);
+            }
+
+            dom.readerSpokenComparison.innerHTML = `<strong>You spoke:</strong> "${chatManager.escapeHtml(spokenText)}"`;
+        }
+    };
+
+    // ==========================================
+    // 10.6. FIREBASE AUTH & USER PROFILE UI
+    // ==========================================
+    const authManagerUI = {
+        init() {
+            if (window.authManager) {
+                authManager.init();
+                authManager.onAuthStateChanged(user => {
+                    authManagerUI.renderAuthState(user);
+                });
+            }
+
+            const loginTriggers = [
+                dom.gateGoogleLoginBtn,
+                dom.sidebarGoogleLoginBtn,
+                dom.topbarLoginBtn,
+                dom.settingsGoogleLoginBtn
+            ];
+            loginTriggers.forEach(btn => {
+                if (btn) {
+                    btn.addEventListener('click', async () => {
+                        authManagerUI.handleGoogleLogin();
+                    });
+                }
+            });
+
+            const logoutTriggers = [
+                dom.userLogoutBtn,
+                dom.settingsLogoutBtn
+            ];
+            logoutTriggers.forEach(btn => {
+                if (btn) {
+                    btn.addEventListener('click', async () => {
+                        document.documentElement.classList.remove('user-cached-logged-in');
+                        if (window.authManager) {
+                            await authManager.signOut();
+                        }
+                    });
+                }
+            });
+
+            if (dom.topbarProfileBadge) {
+                dom.topbarProfileBadge.addEventListener('click', () => {
+                    tabManager.switchTab('settings');
+                });
+            }
+
+            if (dom.toggleFirebaseKeysBtn) {
+                dom.toggleFirebaseKeysBtn.addEventListener('click', () => {
+                    dom.firebaseKeysContainer.classList.toggle('hidden');
+                });
+            }
+
+            if (dom.saveFirebaseConfigBtn) {
+                dom.saveFirebaseConfigBtn.addEventListener('click', () => {
+                    const newConfig = {
+                        apiKey: dom.fbApiKey.value.trim(),
+                        authDomain: dom.fbAuthDomain.value.trim(),
+                        projectId: dom.fbProjectId.value.trim(),
+                        storageBucket: dom.fbStorageBucket.value.trim(),
+                        appId: dom.fbAppId.value.trim()
+                    };
+                    if (window.authManager) {
+                        authManager.saveConfig(newConfig);
+                        dom.firebaseSaveMsg.classList.remove('hidden');
+                        setTimeout(() => dom.firebaseSaveMsg.classList.add('hidden'), 3000);
+                        dom.firebaseStatusPill.textContent = 'Firebase Saved';
+                    }
+                });
+            }
+
+            if (window.authManager) {
+                const cfg = authManager.getConfig();
+                if (dom.fbApiKey) dom.fbApiKey.value = cfg.apiKey || '';
+                if (dom.fbAuthDomain) dom.fbAuthDomain.value = cfg.authDomain || '';
+                if (dom.fbProjectId) dom.fbProjectId.value = cfg.projectId || '';
+                if (dom.fbStorageBucket) dom.fbStorageBucket.value = cfg.storageBucket || '';
+                if (dom.fbAppId) dom.fbAppId.value = cfg.appId || '';
+            }
+        },
+
+        async handleGoogleLogin() {
+            if (dom.gateStatusMsg) dom.gateStatusMsg.classList.add('hidden');
+            if (dom.gateGoogleLoginBtn) {
+                dom.gateGoogleLoginBtn.disabled = true;
+                dom.gateGoogleLoginBtn.style.opacity = '0.7';
+            }
+
+            try {
+                if (!window.authManager || !authManager.isConfigured()) {
+                    tabManager.switchTab('settings');
+                    dom.firebaseKeysContainer.classList.remove('hidden');
+                    dom.firebaseKeysContainer.scrollIntoView({ behavior: 'smooth' });
+                    throw new Error('To enable Google Login, please save your Firebase project configuration.');
+                }
+                await authManager.signInWithGoogle();
+            } catch (err) {
+                console.error('Google Sign-in error:', err);
+                const msg = err.code === 'auth/popup-blocked'
+                    ? 'Popup blocked! Please allow popups for localhost to sign in with Google.'
+                    : (err.message || 'Error connecting to Google.');
+
+                if (dom.gateStatusMsg) {
+                    dom.gateStatusMsg.textContent = msg;
+                    dom.gateStatusMsg.classList.remove('hidden');
+                } else {
+                    alert('Google Sign-In: ' + msg);
+                }
+            } finally {
+                if (dom.gateGoogleLoginBtn) {
+                    dom.gateGoogleLoginBtn.disabled = false;
+                    dom.gateGoogleLoginBtn.style.opacity = '1';
+                }
+            }
+        },
+
+        renderAuthState(user) {
+            state.user = user;
+            const isLoggedIn = Boolean(user);
+
+            // Synchronous anti-flicker class
+            if (isLoggedIn) {
+                document.documentElement.classList.add('user-cached-logged-in');
+            } else {
+                document.documentElement.classList.remove('user-cached-logged-in');
+            }
+
+            // Mandatory Auth Gate Lock
+            if (dom.authGateModal) {
+                dom.authGateModal.classList.toggle('gate-hidden', isLoggedIn);
+            }
+            if (dom.app) {
+                dom.app.classList.toggle('auth-locked', !isLoggedIn);
+            }
+            if (dom.gateStatusMsg) {
+                dom.gateStatusMsg.classList.add('hidden');
+            }
+
+            if (dom.userLoggedOut) dom.userLoggedOut.classList.toggle('hidden', isLoggedIn);
+            if (dom.userLoggedIn) dom.userLoggedIn.classList.toggle('hidden', !isLoggedIn);
+
+            if (dom.topbarLoginBtn) dom.topbarLoginBtn.classList.toggle('hidden', isLoggedIn);
+            if (dom.topbarProfileBadge) dom.topbarProfileBadge.classList.toggle('hidden', !isLoggedIn);
+
+            if (dom.settingsUserLoggedOut) dom.settingsUserLoggedOut.classList.toggle('hidden', isLoggedIn);
+            if (dom.settingsUserLoggedIn) dom.settingsUserLoggedIn.classList.toggle('hidden', !isLoggedIn);
+
+            if (user) {
+                const name = user.displayName || 'Learner';
+                const email = user.email || '';
+                const photo = user.photoURL || 'logo.png';
+
+                if (dom.userDisplayName) dom.userDisplayName.textContent = name;
+                if (dom.userEmailText) dom.userEmailText.textContent = email;
+                if (dom.userAvatarImg) dom.userAvatarImg.src = photo;
+
+                if (dom.topbarAvatarImg) dom.topbarAvatarImg.src = photo;
+
+                if (dom.settingsUserName) dom.settingsUserName.textContent = name;
+                if (dom.settingsUserEmail) dom.settingsUserEmail.textContent = email;
+                if (dom.settingsUserAvatar) dom.settingsUserAvatar.src = photo;
+
+                if (dom.firebaseStatusPill) dom.firebaseStatusPill.textContent = 'Account Connected';
+
+                if (window.learningProgressManager) {
+                    learningProgressManager.init();
+                }
+            }
+        }
+    };
+
+    // ==========================================
     // 11. TAB & UI NAVIGATION
     // ==========================================
     const tabManager = {
@@ -1921,17 +3485,19 @@ Respond ONLY in this valid JSON format:
             // Page Title
             const titles = {
                 chat: 'Queen Rat AI',
+                reading: 'Reading Practice Studio',
                 tenses: 'Daily Tenses Mastery',
                 words: 'Daily Vocabulary',
                 roleplay: 'Roleplay Drills',
-                settings: 'Voice & AI Settings'
+                settings: 'Voice & Learning Preferences'
             };
             const subtitles = {
                 chat: 'Spoken English Tutor with Tamil Voice',
+                reading: 'Read Aloud, Test Pronunciation & Instant Tamil Translation',
                 tenses: '12 English Tenses with Tamil Rules & Audio',
                 words: 'Words, Tamil Meaning, Pronunciation & Quizzes',
                 roleplay: 'Practice Real Life English Scenarios',
-                settings: 'AI Provider, Voice Pitch & Learning Level'
+                settings: 'Cloud Account, Voice Speed & Learning Level'
             };
 
             dom.pageTitle.textContent = titles[tabId] || 'Queen Rat AI';
@@ -1950,9 +3516,28 @@ Respond ONLY in this valid JSON format:
     // 12. INITIALIZATION & EVENT LISTENERS
     // ==========================================
     function init() {
+        window.tabManager = tabManager;
         // Tab switching
-        dom.navItems.forEach(n => n.addEventListener('click', () => tabManager.switchTab(n.dataset.tab)));
+        dom.navItems.forEach(n => n.addEventListener('click', () => {
+            tabManager.switchTab(n.dataset.tab);
+            if (dom.sidebar) dom.sidebar.classList.remove('open');
+            if (dom.sidebarOverlay) dom.sidebarOverlay.classList.remove('open');
+        }));
         dom.mobileNavBtns.forEach(b => b.addEventListener('click', () => tabManager.switchTab(b.dataset.tab)));
+
+        // Handle URL Hash navigation
+        if (window.location.hash) {
+            const initialTab = window.location.hash.replace('#', '');
+            if (['chat', 'reading', 'tenses', 'words', 'roleplay', 'settings'].includes(initialTab)) {
+                tabManager.switchTab(initialTab);
+            }
+        }
+        window.addEventListener('hashchange', () => {
+            const h = window.location.hash.replace('#', '');
+            if (['chat', 'reading', 'tenses', 'words', 'roleplay', 'settings'].includes(h)) {
+                tabManager.switchTab(h);
+            }
+        });
 
         // Mobile drawer with backdrop
         dom.menuToggle.addEventListener('click', () => {
@@ -2046,13 +3631,19 @@ Respond ONLY in this valid JSON format:
         });
 
         // Settings Listeners
-        dom.aiProviderSelect.value = state.aiProvider;
-        dom.aiProviderSelect.addEventListener('change', () => {
-            state.aiProvider = dom.aiProviderSelect.value;
-            localStorage.setItem('sw_ai_provider', state.aiProvider);
-            dom.groqKeyContainer.classList.toggle('hidden', state.aiProvider !== 'groq');
-            dom.sidebarProviderLabel.textContent = state.aiProvider === 'groq' ? 'Groq Cloud Active' : 'Free AI Active · No Key Needed';
-        });
+        if (dom.aiProviderSelect) {
+            dom.aiProviderSelect.value = state.aiProvider;
+            dom.aiProviderSelect.addEventListener('change', () => {
+                state.aiProvider = dom.aiProviderSelect.value;
+                localStorage.setItem('sw_ai_provider', state.aiProvider);
+                if (dom.groqKeyContainer) {
+                    dom.groqKeyContainer.classList.toggle('hidden', state.aiProvider !== 'groq');
+                }
+                if (dom.sidebarProviderLabel) {
+                    dom.sidebarProviderLabel.textContent = state.aiProvider === 'groq' ? 'Groq Cloud Active' : '';
+                }
+            });
+        }
 
         if (dom.groqApiKey) {
             dom.groqApiKey.value = state.groqKey;
@@ -2115,15 +3706,42 @@ Respond ONLY in this valid JSON format:
             });
         }
 
+        // AI Tenses Generator buttons
+        if (dom.aiGenerateTenseBtn) {
+            dom.aiGenerateTenseBtn.addEventListener('click', () => tensesManager.generateAITenseDrill());
+        }
+        if (dom.aiTenseQuizBtn) {
+            dom.aiTenseQuizBtn.addEventListener('click', () => tensesManager.fetchNewAITenseQuiz());
+        }
+        if (dom.aiTenseCloseBtn) {
+            dom.aiTenseCloseBtn.addEventListener('click', () => {
+                if (dom.aiTenseDynamicBox) dom.aiTenseDynamicBox.classList.add('hidden');
+            });
+        }
+
+        // AI Words Generator buttons
+        if (dom.aiGenerateSingleWordBtn) {
+            dom.aiGenerateSingleWordBtn.addEventListener('click', () => wordsManager.generateAIWord());
+        }
+        if (dom.aiGenerateBatchWordsBtn) {
+            dom.aiGenerateBatchWordsBtn.addEventListener('click', () => wordsManager.generateBatchWords(5));
+        }
+        if (dom.aiVocabQuizBtn) {
+            dom.aiVocabQuizBtn.addEventListener('click', () => wordsManager.generateAIVocabQuiz());
+        }
+
         // Initialize sub-systems
         voiceManager.init();
         chatManager.renderWelcome();
         tensesManager.renderTenses('all');
-        tensesManager.renderTenseQuiz();
+        tensesManager.fetchNewAITenseQuiz();
         wordsManager.renderWordOfDay();
         wordsManager.renderWordsList('all');
         wordsManager.renderVocabQuiz();
         wordsManager.initWordSearch();
+        readingManager.init();
+        authManagerUI.init();
+        learningProgressManager.init();
         dom.vocabScoreBadge.textContent = `Score: ${state.vocabScore}`;
     }
 
