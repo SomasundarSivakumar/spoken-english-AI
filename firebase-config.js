@@ -83,6 +83,37 @@
                         }
                         this.notifyAuthListeners(user);
                     });
+
+                    // Handle redirect result (mandatory for mobile Google login & Vercel)
+                    if (this.auth.getRedirectResult) {
+                        this.auth.getRedirectResult().then(result => {
+                            if (result && result.user) {
+                                console.log("Firebase redirect sign-in completed:", result.user);
+                                this.currentUser = result.user;
+                                localStorage.setItem('sw_cached_user', JSON.stringify({
+                                    uid: result.user.uid,
+                                    displayName: result.user.displayName,
+                                    email: result.user.email,
+                                    photoURL: result.user.photoURL
+                                }));
+                                document.documentElement.classList.add('user-cached-logged-in');
+                                this.syncUserToCloud(result.user);
+                                this.notifyAuthListeners(result.user);
+                            }
+                        }).catch(redirectErr => {
+                            console.error('Firebase getRedirectResult error:', redirectErr);
+                            const gateMsg = document.getElementById('gate-status-msg');
+                            if (gateMsg) {
+                                if (redirectErr.code === 'auth/unauthorized-domain') {
+                                    gateMsg.innerHTML = `⚠️ <strong>Domain Unauthorized in Firebase</strong><br>
+                                    Please add <code>${window.location.hostname}</code> to <strong>Firebase Console &gt; Authentication &gt; Settings &gt; Authorized domains</strong>.`;
+                                } else {
+                                    gateMsg.textContent = redirectErr.message || 'Login error occurred.';
+                                }
+                                gateMsg.classList.remove('hidden');
+                            }
+                        });
+                    }
                 } catch (err) {
                     console.error('Firebase initialization error:', err);
                     this.isReady = false;
@@ -158,7 +189,20 @@
             const provider = new firebase.auth.GoogleAuthProvider();
             provider.addScope('profile');
             provider.addScope('email');
+            provider.setCustomParameters({ prompt: 'select_account' });
 
+            // Mobile detection: Mobile browsers (Chrome Android, Safari iOS, in-app webviews)
+            // block popups by default. signInWithRedirect provides seamless native mobile login.
+            const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
+                || (window.innerWidth <= 768)
+                || (window.matchMedia && window.matchMedia('(pointer: coarse)').matches);
+
+            if (isMobile) {
+                console.log('Mobile device detected — initiating Firebase signInWithRedirect');
+                return await this.auth.signInWithRedirect(provider);
+            }
+
+            // Desktop flow: try popup first, automatically fallback to redirect if popup is blocked
             try {
                 const result = await this.auth.signInWithPopup(provider);
                 this.currentUser = result.user;
@@ -168,10 +212,16 @@
                     email: result.user.email,
                     photoURL: result.user.photoURL
                 }));
+                document.documentElement.classList.add('user-cached-logged-in');
+                await this.syncUserToCloud(result.user);
+                this.notifyAuthListeners(result.user);
                 return result.user;
             } catch (error) {
-                // If popup was blocked or failed, try redirect or surface error
-                console.error('Firebase Google Sign-In error:', error);
+                console.warn('Popup login notice, evaluating redirect fallback:', error);
+                if (error.code === 'auth/popup-blocked' || error.code === 'auth/popup-closed-by-user' || error.code === 'auth/cancelled-popup-request') {
+                    console.log('Popup blocked or cancelled, falling back to signInWithRedirect...');
+                    return await this.auth.signInWithRedirect(provider);
+                }
                 throw error;
             }
         },

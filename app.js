@@ -3395,15 +3395,27 @@ Respond ONLY as a valid JSON object formatted as:
                 await authManager.signInWithGoogle();
             } catch (err) {
                 console.error('Google Sign-in error:', err);
-                const msg = err.code === 'auth/popup-blocked'
-                    ? 'Popup blocked! Please allow popups for localhost to sign in with Google.'
-                    : (err.message || 'Error connecting to Google.');
+                let msg = err.message || 'Error connecting to Google.';
+                const currentHost = window.location.hostname;
+
+                if (err.code === 'auth/unauthorized-domain') {
+                    msg = `⚠️ <strong>Domain Unauthorized in Firebase</strong><br>
+                    Firebase is blocking logins from <code>${currentHost}</code>.<br><br>
+                    <strong>Fix in 1 minute:</strong><br>
+                    1. Open <a href="https://console.firebase.google.com" target="_blank" style="color:#fde047;text-decoration:underline;">Firebase Console</a> &gt; Select your project.<br>
+                    2. Go to <strong>Authentication &gt; Settings &gt; Authorized domains</strong>.<br>
+                    3. Click <strong>Add domain</strong> &amp; add <code>${currentHost}</code>.`;
+                } else if (err.code === 'auth/popup-blocked') {
+                    msg = 'Popup blocked! Please allow popups or tap again to use Google direct redirect.';
+                } else if (err.code === 'auth/operation-not-allowed') {
+                    msg = 'Google provider is not enabled in Firebase Console. Go to Authentication > Sign-in method > Google and enable it.';
+                }
 
                 if (dom.gateStatusMsg) {
-                    dom.gateStatusMsg.textContent = msg;
+                    dom.gateStatusMsg.innerHTML = msg;
                     dom.gateStatusMsg.classList.remove('hidden');
                 } else {
-                    alert('Google Sign-In: ' + msg);
+                    alert('Google Sign-In Notice: ' + msg);
                 }
             } finally {
                 if (dom.gateGoogleLoginBtn) {
