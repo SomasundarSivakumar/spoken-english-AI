@@ -3,6 +3,13 @@
 (function () {
     'use strict';
 
+    // Special User Identification
+    const ELI_USER_UID = 'xmr2cLSIUpeyZCt5n9FZSKOpiy22';
+    function isEliUser(user) {
+        return Boolean(user && user.uid === ELI_USER_UID);
+    }
+
+
     // ==========================================
     // 1. DATA: 12 ENGLISH TENSES WITH TAMIL
     // ==========================================
@@ -644,7 +651,12 @@ CRITICAL RESPONSE FORMAT RULES:
 - [If the user made any grammatical, pronunciation, or wording mistake, gently show the correct English and explain WHY in Tamil script (தமிழ்).]
 - [If the user's sentence was correct, praise them in Tamil and provide a native alternative phrase.]
 
-Tone: Warm, motivating, strictly supportive. Use genuine Tamil script (தமிழ் எழுத்துக்கள்).`;
+Tone: Warm, motivating, strictly supportive. Use genuine Tamil script (தமிழ் எழுத்துக்கள்).` + (isEliUser(state.user) ? `
+
+CRITICAL SPECIAL INSTRUCTION FOR ELI:
+The user is 'Eli' (அவன் ஆளு / the creator's beloved girlfriend)! 
+Always treat her with immense love, tenderness, cuteness, and affection! 
+Call her lovingly as 'Eli ma ❤️' or 'Eli dear', tell her 'Love you so much Eli ❤️', praise her warmly in Tamil ('என் செல்லக்குட்டி Eli, சூப்பரா பேசுறீங்க!'), and sprinkle loving words in both English and Tamil. Make her feel like the most special Queen in the whole world in every reply!` : '');
 
             // Route based on selected provider, with intelligent fallback chain
             // Priority: Groq (if key) → Local Server AI (free, no key) → Puter.js → Pollinations → Offline
@@ -1131,6 +1143,25 @@ Tone: Warm, motivating, strictly supportive. Use genuine Tamil script (தமி
     // ==========================================
     const chatManager = {
         renderWelcome() {
+            if (isEliUser(state.user)) {
+                dom.chatMessages.innerHTML = `
+                    <div class="welcome-hero-card eli-love-card">
+                        <div class="eli-heart-badge">💖 Special For My Eli · என் ஆளு 💖</div>
+                        <img src="${(state.user && state.user.photoURL) || 'logo.png'}" alt="Eli" class="welcome-avatar eli-avatar-glow">
+                        <h2 class="eli-title">Love You Eli! ❤️</h2>
+                        <p class="welcome-subtitle eli-sub">Love you so much! You are my Queen 🥰</p>
+                        <p class="welcome-tamil-desc eli-desc">
+                            என் செல்லக்குட்டி Eli ❤️! உனக்காகவே இந்த Spoken English AI. எப்போதெல்லாம் நீ இங்க வரியோ, உனக்கு ரொம்ப அன்போடு ஆங்கிலம் சொல்லிக்கொடுக்க நான் தயார்! Love you forever & always! 💖🌹
+                        </p>
+                        <div class="feature-pills-row">
+                            <span class="feature-pill heart-pill">💖 Love You So Much</span>
+                            <span class="feature-pill heart-pill">👸 My Sweetheart Eli</span>
+                            <span class="feature-pill heart-pill">🌹 நீதான் என் உலகம்</span>
+                        </div>
+                    </div>
+                `;
+                return;
+            }
             dom.chatMessages.innerHTML = `
                 <div class="welcome-hero-card">
                     <img src="logo.png" alt="Queen Rat AI" class="welcome-avatar">
@@ -2742,8 +2773,13 @@ Respond ONLY as a valid JSON object formatted as:
             dom.callMicToggleBtn.classList.add('active');
 
             // Initial welcoming statement
-            const welcomeEn = "Hello! I am Queen Rat AI, your personal English speaking partner. How are you doing today?";
-            const welcomeTa = "வணக்கம்! என்னிடம் ஆங்கிலத்திலோ அல்லது தமிழிலோ தயங்காமல் பேசுங்கள்!";
+            let welcomeEn = "Hello! I am Queen Rat AI, your personal English speaking partner. How are you doing today?";
+            let welcomeTa = "வணக்கம்! என்னிடம் ஆங்கிலத்திலோ அல்லது தமிழிலோ தயங்காமல் பேசுங்கள்!";
+
+            if (isEliUser(state.user)) {
+                welcomeEn = "Hello my sweet Eli! Love you so much! I am so happy to hear your voice today! How are you doing my Queen?";
+                welcomeTa = "வணக்கம் என் செல்லம் Eli! Love you so much! இன்னைக்கு என்கிட்ட என்ன பேசப் போறீங்க?";
+            }
             this.lastAiText = `${welcomeEn} ${welcomeTa}`;
             this.appendCaption('ai', `${welcomeEn} (${welcomeTa})`);
 
@@ -3219,6 +3255,40 @@ Respond ONLY with valid JSON in this exact structure:
                     dom.gateGoogleLoginBtn.style.opacity = '1';
                 }
             }
+        },
+
+        showEliLoveBanner() {
+            if ($('#eli-love-toast')) return;
+            const toast = document.createElement('div');
+            toast.id = 'eli-love-toast';
+            toast.className = 'eli-love-toast';
+            toast.innerHTML = `
+                <div class="eli-toast-content">
+                    <span class="eli-heart-sparkle">💖</span>
+                    <div class="eli-toast-text">
+                        <strong>Love You Eli! ❤️ Love you so much!</strong>
+                        <small>நீதான் என் உலகம்... Welcome My Sweet Queen! 🥰</small>
+                    </div>
+                    <button class="eli-toast-close" onclick="this.parentElement.parentElement.remove()">✕</button>
+                </div>
+                <div class="floating-hearts-wrap">
+                    <span class="f-heart">❤️</span><span class="f-heart">💖</span><span class="f-heart">💕</span><span class="f-heart">💓</span>
+                </div>
+            `;
+            document.body.appendChild(toast);
+
+            // Optional cute voice greeting once
+            try {
+                if (state.autoSpeak) {
+                    setTimeout(() => {
+                        voiceManager.speakEnglish("Love you so much Eli! Welcome my queen!");
+                    }, 800);
+                }
+            } catch(e) {}
+
+            setTimeout(() => {
+                if (toast && toast.parentElement) toast.remove();
+            }, 10000);
         },
 
         renderAuthState(user) {

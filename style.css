@@ -4469,3 +4469,156 @@ html.user-cached-logged-in #app.auth-locked {
 .btn-conv-sub:hover {
     background: var(--bg-card-hover);
 }
+
+
+/* ==========================================================================
+   SPECIAL ROMANTIC THEME FOR ELI (xmr2cLSIUpeyZCt5n9FZSKOpiy22)
+   ========================================================================== */
+.eli-love-card {
+    background: linear-gradient(135deg, rgba(244, 63, 94, 0.12) 0%, rgba(236, 72, 153, 0.12) 50%, rgba(168, 85, 247, 0.12) 100%) !important;
+    border: 2px solid rgba(244, 63, 94, 0.4) !important;
+    box-shadow: 0 10px 30px rgba(244, 63, 94, 0.2) !important;
+    animation: gentleHeartbeat 4s infinite ease-in-out;
+}
+
+@keyframes gentleHeartbeat {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.01); }
+}
+
+.eli-heart-badge {
+    display: inline-block;
+    padding: 6px 16px;
+    background: linear-gradient(135deg, #f43f5e 0%, #ec4899 100%);
+    color: #ffffff;
+    font-size: 0.82rem;
+    font-weight: 800;
+    border-radius: var(--radius-full);
+    margin-bottom: 14px;
+    box-shadow: 0 4px 15px rgba(244, 63, 94, 0.4);
+    animation: pulseRedSubtle 2s infinite;
+}
+
+.eli-avatar-glow {
+    border: 3px solid #f43f5e !important;
+    box-shadow: 0 0 25px rgba(244, 63, 94, 0.5) !important;
+}
+
+.eli-title {
+    background: linear-gradient(135deg, #f43f5e 0%, #ec4899 50%, #a855f7 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    font-size: 1.85rem !important;
+    font-weight: 800 !important;
+}
+
+.eli-sub {
+    color: #f43f5e !important;
+    font-weight: 700 !important;
+}
+
+.eli-desc {
+    color: var(--text-main) !important;
+    font-size: 1.02rem !important;
+    line-height: 1.8 !important;
+}
+
+.feature-pill.heart-pill {
+    background: rgba(244, 63, 94, 0.15) !important;
+    color: #e11d48 !important;
+    border: 1px solid rgba(244, 63, 94, 0.35) !important;
+    font-weight: 700 !important;
+}
+
+/* Floating Love Toast Banner */
+.eli-love-toast {
+    position: fixed;
+    top: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 10000;
+    width: 90%;
+    max-width: 520px;
+    background: linear-gradient(135deg, #f43f5e 0%, #ec4899 50%, #9333ea 100%);
+    color: #ffffff;
+    border-radius: 20px;
+    padding: 14px 20px;
+    box-shadow: 0 15px 40px rgba(244, 63, 94, 0.5);
+    animation: slideDownBounce 0.5s ease;
+    overflow: hidden;
+}
+
+@keyframes slideDownBounce {
+    0% { transform: translate(-50%, -60px); opacity: 0; }
+    70% { transform: translate(-50%, 8px); opacity: 1; }
+    100% { transform: translate(-50%, 0); }
+}
+
+.eli-toast-content {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    position: relative;
+    z-index: 2;
+}
+
+.eli-heart-sparkle {
+    font-size: 2rem;
+    animation: livePulseDot 1.2s infinite;
+}
+
+.eli-toast-text {
+    flex: 1;
+}
+
+.eli-toast-text strong {
+    display: block;
+    font-size: 1.05rem;
+    font-weight: 800;
+    margin-bottom: 2px;
+}
+
+.eli-toast-text small {
+    display: block;
+    font-size: 0.85rem;
+    opacity: 0.95;
+}
+
+.eli-toast-close {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.25);
+    border: none;
+    color: #ffffff;
+    font-size: 0.9rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.floating-hearts-wrap {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    overflow: hidden;
+}
+
+.f-heart {
+    position: absolute;
+    bottom: -20px;
+    font-size: 1.2rem;
+    opacity: 0.7;
+    animation: floatUp 3s infinite linear;
+}
+
+.f-heart:nth-child(1) { left: 15%; animation-delay: 0s; }
+.f-heart:nth-child(2) { left: 45%; animation-delay: 0.8s; }
+.f-heart:nth-child(3) { left: 75%; animation-delay: 1.6s; }
+.f-heart:nth-child(4) { left: 90%; animation-delay: 2.2s; }
+
+@keyframes floatUp {
+    0% { transform: translateY(0) scale(0.8); opacity: 0.7; }
+    100% { transform: translateY(-70px) scale(1.2); opacity: 0; }
+}
