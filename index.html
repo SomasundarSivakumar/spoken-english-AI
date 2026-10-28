@@ -214,6 +214,10 @@
                     </div>
 
                     <!-- Theme Toggle (Light / Dark) -->
+                    <button id="topbar-call-btn" class="topbar-call-btn" title="Live AI Voice Call (நேரடி AI போன் கால்)">
+                        <span class="call-pulse-dot"></span>
+                        <span>📞 Call AI</span>
+                    </button>
                     <button id="theme-toggle-btn" class="icon-btn" title="Toggle Light / Dark Theme">
                         <span id="theme-icon">☀️</span>
                     </button>
@@ -260,6 +264,8 @@
                 <div class="input-area">
                     <!-- Quick Prompt Suggestions Bar -->
                     <div class="quick-prompts-bar">
+                        <button id="chat-call-trigger" class="quick-chip-featured call-pill" title="Direct Voice Call with AI">📞 Live AI Call (நேரடி போன் கால்)</button>
+                        <button id="chat-ta-conv-trigger" class="quick-chip-featured ta-pill" title="Speak Tamil and get fluent English">🔄 தமிழ் ➔ English குரல் மாற்றி</button>
                         <button class="quick-chip" data-prompt="Teach me how to introduce myself in an interview with Tamil meaning">💼 Self Intro</button>
                         <button class="quick-chip" data-prompt="How do I ask for directions politely in English? Explain in Tamil">🗺️ Directions</button>
                         <button class="quick-chip" data-prompt="Teach me 3 useful English idioms used in daily life with Tamil meaning">💡 Daily Idioms</button>
@@ -276,6 +282,10 @@
                     </div>
 
                     <div class="input-container">
+                        <button id="ta-translate-mic-btn" class="ta-mic-quick-btn" title="தமிழில் பேசி ஆங்கிலமாக மாற்று (Speak Tamil ➔ Convert to English)">
+                            <span class="flag-icon">🇮🇳</span>
+                            <span class="ta-btn-label">தமிழ்</span>
+                        </button>
                         <button id="mic-btn" class="mic-btn" title="Speak (English / தமிழ்)" aria-label="Microphone">
                             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
                         </button>
@@ -587,6 +597,30 @@
                                     </div>
                                 </div>
                                 <div id="reader-spoken-comparison" class="reader-comparison-box"></div>
+
+                                <!-- Detailed Word-by-Word Pronunciation Accuracy Highlighter & Drill (Feature 2) -->
+                                <div id="reader-pronounce-breakdown" class="reader-pronounce-breakdown hidden">
+                                    <div class="pronounce-breakdown-header">
+                                        <h4>🎯 Word-by-Word Pronunciation Coach (உச்சரிப்பு திருத்தம்)</h4>
+                                        <small>சிவப்பு வார்த்தையை அழுத்தினால் அதன் துல்லியமான தமிழ் உச்சரிப்பைக் கேட்டுப் பயிற்சி செய்யலாம்!</small>
+                                    </div>
+                                    <div id="pronounce-chips-container" class="pronounce-chips-grid"></div>
+                                    <!-- Selected Mispronounced Word Detail Inspector -->
+                                    <div id="pronounce-word-detail-card" class="pronounce-word-card hidden">
+                                        <div class="pwd-top">
+                                            <div class="pwd-word-info">
+                                                <h3 id="pwd-word-text">word</h3>
+                                                <span id="pwd-tamil-phonetic" class="pwd-phonetic">வார்த்தை</span>
+                                                <span id="pwd-tamil-meaning" class="pwd-meaning">அர்த்தம்</span>
+                                            </div>
+                                            <div class="pwd-actions">
+                                                <button id="pwd-listen-btn" class="btn-pwd-listen" title="Listen Native Pronunciation">🔊 Listen</button>
+                                                <button id="pwd-practice-btn" class="btn-pwd-mic" title="Speak this single word">🎙️ Test Word</button>
+                                            </div>
+                                        </div>
+                                        <div id="pwd-test-feedback" class="pwd-test-status hidden"></div>
+                                    </div>
+                                </div>
                             </div>
                         </div>
 
@@ -788,6 +822,127 @@
         </nav>
     </div>
 
-    <script src="app.js?v=11"></script>
+    
+    <!-- ===== MODAL 1: LIVE AI VOICE CALL (FEATURE 1) ===== -->
+    <div id="ai-call-modal" class="ai-call-overlay hidden">
+        <div class="ai-call-container">
+            <div class="call-top-bar">
+                <div class="call-badge-live">
+                    <span class="live-pulse-dot"></span>
+                    <span id="call-status-indicator">Connected · Spoken English Call</span>
+                </div>
+                <button id="call-exit-btn" class="call-close-icon" title="Close Call">✕</button>
+            </div>
+
+            <div class="call-avatar-zone">
+                <div class="call-avatar-pulse-wrap" id="call-pulse-wrap">
+                    <div class="call-avatar-circle">
+                        <img src="logo.png" alt="Queen Rat AI" class="call-avatar-img">
+                    </div>
+                    <div class="call-wave wave-1"></div>
+                    <div class="call-wave wave-2"></div>
+                    <div class="call-wave wave-3"></div>
+                </div>
+                <h2 class="call-partner-title">Queen Rat AI Tutor</h2>
+                <p id="call-state-hint" class="call-state-hint">🎙️ Listening... Speak naturally in English or தமிழ்</p>
+            </div>
+
+            <!-- Live Call Captions Box -->
+            <div class="call-transcript-container">
+                <div id="call-captions-list" class="call-captions-list">
+                    <div class="call-caption-bubble ai">
+                        <span class="speaker-tag">AI Tutor:</span>
+                        <p>Hello! I am your Spoken English practice partner. Speak to me freely in English or Tamil, and I will reply with voice & Tamil tips!</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Call Control Buttons -->
+            <div class="call-controls-row">
+                <button id="call-mic-toggle-btn" class="call-ctrl-btn active" title="Mute/Unmute Mic">
+                    <span class="ctrl-icon" id="call-mic-icon">🎙️</span>
+                    <span id="call-mic-text">Speaking</span>
+                </button>
+                <button id="call-hangup-btn" class="call-hangup-btn" title="End Call">
+                    <span class="hangup-icon">📞</span>
+                    <span>End Call</span>
+                </button>
+                <button id="call-repeat-audio-btn" class="call-ctrl-btn" title="Listen AI Reply Again">
+                    <span class="ctrl-icon">🔊</span>
+                    <span>Repeat</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== MODAL 2: TAMIL TO ENGLISH VOICE CONVERTER (FEATURE 3) ===== -->
+    <div id="ta-en-converter-modal" class="converter-overlay hidden">
+        <div class="converter-card">
+            <div class="converter-header">
+                <div class="converter-title-wrap">
+                    <span class="converter-badge">🔄 Voice Converter</span>
+                    <h3>தமிழ் ➔ English Instant Voice Translator</h3>
+                    <p>தமிழில் பேசுங்கள் — இயல்பான, அழகான ஆங்கிலமாக மாற்றி ஒலிவடிவில் தரும்!</p>
+                </div>
+                <button id="converter-close-btn" class="converter-close-btn">✕</button>
+            </div>
+
+            <div class="converter-body">
+                <!-- Tamil Input Mic Area -->
+                <div class="converter-input-zone">
+                    <label class="converter-label">1. உங்கள் தமிழ் வாக்கியம் (Speak or Type in Tamil):</label>
+                    <div class="converter-mic-row">
+                        <button id="converter-ta-mic-btn" class="btn-ta-mic">
+                            <span class="mic-wave-icon">🎙️</span>
+                            <span id="converter-ta-mic-label">தமிழில் பேசவும் (Click to Speak Tamil)</span>
+                        </button>
+                    </div>
+                    <textarea id="converter-ta-input" placeholder="எ.கா: எனக்கு நாளைக்கு லீவு வேணும், மேனேஜரிடம் எப்படி கேட்பது? அல்லது இங்கு தட்டச்சு செய்யுங்கள்..." rows="2"></textarea>
+                    <button id="converter-translate-btn" class="btn-convert-action">
+                        ✨ Convert to Fluent English (ஆங்கிலமாக மாற்று)
+                    </button>
+                </div>
+
+                <!-- Conversion Output Cards -->
+                <div id="converter-results" class="converter-results hidden">
+                    <div class="result-box primary-result">
+                        <div class="result-header">
+                            <span class="tag-primary">🌟 Best Spoken English (இயல்பான பேச்சு)</span>
+                            <button id="conv-speak-primary" class="btn-audio-pill">🔊 Listen</button>
+                        </div>
+                        <h4 id="conv-primary-en" class="conv-en-text">Could you please grant me leave for tomorrow?</h4>
+                        <div class="conv-ta-guide">
+                            <span class="guide-label">🗣️ Tamil உச்சரிப்பு:</span>
+                            <span id="conv-phonetic-ta" class="guide-text">குட் யூ ப்ளீஸ் கிரான்ட் மீ லீவ் ஃபார் டுமாரோ?</span>
+                        </div>
+                    </div>
+
+                    <div class="variations-grid">
+                        <div class="var-card">
+                            <div class="var-header">
+                                <span class="var-tag">💼 Formal / Office</span>
+                                <button id="conv-speak-formal" class="btn-audio-mini">🔊</button>
+                            </div>
+                            <p id="conv-formal-en">I would like to request leave for tomorrow due to personal reasons.</p>
+                        </div>
+                        <div class="var-card">
+                            <div class="var-header">
+                                <span class="var-tag">☕ Casual / Friendly</span>
+                                <button id="conv-speak-casual" class="btn-audio-mini">🔊</button>
+                            </div>
+                            <p id="conv-casual-en">I won't be able to make it tomorrow, can I take the day off?</p>
+                        </div>
+                    </div>
+
+                    <div class="converter-footer-actions">
+                        <button id="conv-send-chat-btn" class="btn-conv-sub">💬 Send to Chat</button>
+                        <button id="conv-copy-btn" class="btn-conv-sub">📋 Copy English</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js?v=12"></script>
 </body>
 </html>

@@ -359,6 +359,50 @@
         // Roleplay
         roleplayCards: $$('.roleplay-card'),
 
+        // Feature 1: Live AI Voice Call
+        topbarCallBtn: $('#topbar-call-btn'),
+        chatCallTrigger: $('#chat-call-trigger'),
+        aiCallModal: $('#ai-call-modal'),
+        callExitBtn: $('#call-exit-btn'),
+        callPulseWrap: $('#call-pulse-wrap'),
+        callStateHint: $('#call-state-hint'),
+        callCaptionsList: $('#call-captions-list'),
+        callMicToggleBtn: $('#call-mic-toggle-btn'),
+        callMicText: $('#call-mic-text'),
+        callHangupBtn: $('#call-hangup-btn'),
+        callRepeatAudioBtn: $('#call-repeat-audio-btn'),
+
+        // Feature 2: Pronunciation Accuracy Breakdown
+        readerPronounceBreakdown: $('#reader-pronounce-breakdown'),
+        pronounceChipsContainer: $('#pronounce-chips-container'),
+        pronounceWordDetailCard: $('#pronounce-word-detail-card'),
+        pwdWordText: $('#pwd-word-text'),
+        pwdTamilPhonetic: $('#pwd-tamil-phonetic'),
+        pwdTamilMeaning: $('#pwd-tamil-meaning'),
+        pwdListenBtn: $('#pwd-listen-btn'),
+        pwdPracticeBtn: $('#pwd-practice-btn'),
+        pwdTestFeedback: $('#pwd-test-feedback'),
+
+        // Feature 3: Tamil to English Voice Converter
+        chatTaConvTrigger: $('#chat-ta-conv-trigger'),
+        taTranslateMicBtn: $('#ta-translate-mic-btn'),
+        taEnConverterModal: $('#ta-en-converter-modal'),
+        converterCloseBtn: $('#converter-close-btn'),
+        converterTaMicBtn: $('#converter-ta-mic-btn'),
+        converterTaMicLabel: $('#converter-ta-mic-label'),
+        converterTaInput: $('#converter-ta-input'),
+        converterTranslateBtn: $('#converter-translate-btn'),
+        converterResults: $('#converter-results'),
+        convPrimaryEn: $('#conv-primary-en'),
+        convPhoneticTa: $('#conv-phonetic-ta'),
+        convSpeakPrimary: $('#conv-speak-primary'),
+        convFormalEn: $('#conv-formal-en'),
+        convSpeakFormal: $('#conv-speak-formal'),
+        convCasualEn: $('#conv-casual-en'),
+        convSpeakCasual: $('#conv-speak-casual'),
+        convSendChatBtn: $('#conv-send-chat-btn'),
+        convCopyBtn: $('#conv-copy-btn'),
+
         // Settings
         aiProviderSelect: $('#ai-provider-select'),
         groqKeyContainer: $('#groq-key-container'),
@@ -2629,6 +2673,419 @@ Respond ONLY as a valid JSON object formatted as:
             }
 
             dom.readerSpokenComparison.innerHTML = `<strong>You spoke:</strong> "${chatManager.escapeHtml(spokenText)}"`;
+
+            // Hook Feature 2: Detailed Pronunciation Accuracy Breakdown & Word Drill
+            if (window.pronunciationManager || typeof pronunciationManager !== 'undefined') {
+                pronunciationManager.renderBreakdown(targetWords, spokenWords);
+            }
+        }
+    };
+
+    
+    // ==========================================
+    // 10.7. FEATURE 1: LIVE AI VOICE CALL MODE
+    // ==========================================
+    const callManager = {
+        isActive: false,
+        isMuted: false,
+        isSpeaking: false,
+        rec: null,
+        lastAiText: '',
+        callHistory: [],
+
+        init() {
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            if (SpeechRecognition) {
+                const rec = new SpeechRecognition();
+                rec.lang = 'en-US';
+                rec.continuous = false;
+                rec.interimResults = false;
+
+                rec.onresult = (e) => {
+                    const transcript = e.results[0][0].transcript.trim();
+                    if (transcript && callManager.isActive) {
+                        callManager.handleUserSpeech(transcript);
+                    }
+                };
+
+                rec.onerror = (e) => {
+                    if (callManager.isActive && !callManager.isSpeaking && !callManager.isMuted) {
+                        setTimeout(() => {
+                            if (callManager.isActive && !callManager.isSpeaking && !callManager.isMuted) {
+                                callManager.startListening();
+                            }
+                        }, 600);
+                    }
+                };
+
+                rec.onend = () => {
+                    if (callManager.isActive && !callManager.isSpeaking && !callManager.isMuted && !dom.callPulseWrap.classList.contains('thinking')) {
+                        setTimeout(() => {
+                            if (callManager.isActive && !callManager.isSpeaking && !callManager.isMuted) {
+                                callManager.startListening();
+                            }
+                        }, 500);
+                    }
+                };
+
+                this.rec = rec;
+            }
+        },
+
+        startCall() {
+            this.isActive = true;
+            this.isMuted = false;
+            dom.aiCallModal.classList.remove('hidden');
+            dom.callPulseWrap.className = 'call-avatar-pulse-wrap speaking';
+            dom.callStateHint.textContent = '🔊 Connected! AI is introducing...';
+            dom.callMicText.textContent = 'Speaking';
+            dom.callMicToggleBtn.classList.add('active');
+
+            // Initial welcoming statement
+            const welcomeEn = "Hello! I am Queen Rat AI, your personal English speaking partner. How are you doing today?";
+            const welcomeTa = "வணக்கம்! என்னிடம் ஆங்கிலத்திலோ அல்லது தமிழிலோ தயங்காமல் பேசுங்கள்!";
+            this.lastAiText = `${welcomeEn} ${welcomeTa}`;
+            this.appendCaption('ai', `${welcomeEn} (${welcomeTa})`);
+
+            voiceManager.speakEnglish(welcomeEn, () => {
+                if (this.isActive) {
+                    this.startListening();
+                }
+            });
+        },
+
+        startListening() {
+            if (!this.isActive || this.isMuted) return;
+            this.isSpeaking = false;
+            dom.callPulseWrap.className = 'call-avatar-pulse-wrap listening';
+            dom.callStateHint.textContent = '🎙️ Listening to you... Speak in English or தமிழ்';
+            try {
+                if (this.rec) this.rec.start();
+            } catch (err) {}
+        },
+
+        async handleUserSpeech(userText) {
+            this.appendCaption('user', userText);
+            dom.callPulseWrap.className = 'call-avatar-pulse-wrap thinking';
+            dom.callStateHint.textContent = '⏳ AI is thinking of reply...';
+
+            const callPrompt = `You are Queen Rat AI in a live spoken phone call conversation with a Tamil learner. 
+The user just said: "${userText}". 
+Respond in:
+1. Max 2 short, conversational, polite spoken English sentences.
+2. Followed by 1 short Tamil helpful explanation or friendly follow-up question.
+Format:
+English: [English reply]
+Tamil: [Tamil reply]`;
+
+            try {
+                const rawReply = await aiEngine.generateReply(callPrompt);
+                let enPart = rawReply;
+                let taPart = '';
+
+                const enMatch = rawReply.match(/English:\\s*([^\\n]+)/i);
+                const taMatch = rawReply.match(/Tamil:\\s*([^\\n]+)/i);
+                if (enMatch) enPart = enMatch[1].trim();
+                if (taMatch) taPart = taMatch[1].trim();
+
+                this.lastAiText = `${enPart} ${taPart}`;
+                this.appendCaption('ai', `${enPart} ${taPart ? '— ' + taPart : ''}`);
+
+                if (this.isActive) {
+                    this.isSpeaking = true;
+                    dom.callPulseWrap.className = 'call-avatar-pulse-wrap speaking';
+                    dom.callStateHint.textContent = '🔊 AI is speaking to you...';
+                    voiceManager.speakEnglish(enPart, () => {
+                        if (taPart && this.isActive) {
+                            voiceManager.speakTamil(taPart, () => {
+                                if (this.isActive) this.startListening();
+                            });
+                        } else if (this.isActive) {
+                            this.startListening();
+                        }
+                    });
+                }
+            } catch (err) {
+                console.warn('Call AI error:', err);
+                if (this.isActive) this.startListening();
+            }
+        },
+
+        appendCaption(speaker, text) {
+            const bubble = document.createElement('div');
+            bubble.className = `call-caption-bubble ${speaker}`;
+            bubble.innerHTML = `<span class="speaker-tag">${speaker === 'ai' ? 'AI Tutor' : 'You'}:</span><p>${chatManager.escapeHtml(text)}</p>`;
+            dom.callCaptionsList.appendChild(bubble);
+            dom.callCaptionsList.parentElement.scrollTop = dom.callCaptionsList.parentElement.scrollHeight;
+        },
+
+        toggleMute() {
+            this.isMuted = !this.isMuted;
+            if (this.isMuted) {
+                if (this.rec) {
+                    try { this.rec.stop(); } catch(e) {}
+                }
+                dom.callMicToggleBtn.classList.remove('active');
+                dom.callMicText.textContent = 'Muted';
+                dom.callStateHint.textContent = '🔇 Microphone is Muted';
+            } else {
+                dom.callMicToggleBtn.classList.add('active');
+                dom.callMicText.textContent = 'Speaking';
+                this.startListening();
+            }
+        },
+
+        repeatLastAudio() {
+            if (!this.lastAiText) return;
+            voiceManager.speakEnglish(this.lastAiText, () => {
+                if (this.isActive && !this.isMuted) this.startListening();
+            });
+        },
+
+        endCall() {
+            this.isActive = false;
+            this.isSpeaking = false;
+            if (this.rec) {
+                try { this.rec.stop(); } catch(e) {}
+            }
+            voiceManager.stopSpeech();
+            dom.aiCallModal.classList.add('hidden');
+        }
+    };
+
+    // ==========================================================
+    // 10.8. FEATURE 2: PRONUNCIATION ACCURACY HIGHLIGHTER & DRILL
+    // ==========================================================
+    const pronunciationManager = {
+        selectedWord: '',
+
+        renderBreakdown(targetWords, spokenWords) {
+            if (!dom.readerPronounceBreakdown || !dom.pronounceChipsContainer) return;
+
+            dom.readerPronounceBreakdown.classList.remove('hidden');
+            dom.pronounceChipsContainer.innerHTML = '';
+            dom.pronounceWordDetailCard.classList.add('hidden');
+
+            const spokenSet = new Set(spokenWords.map(w => w.toLowerCase()));
+
+            targetWords.forEach(word => {
+                const clean = word.toLowerCase().replace(/[^a-z]/g, '');
+                if (!clean) return;
+
+                const isCorrect = spokenSet.has(clean);
+                const chip = document.createElement('button');
+                chip.type = 'button';
+                chip.className = `pronounce-chip ${isCorrect ? 'correct' : 'missed'}`;
+                chip.dataset.word = clean;
+                chip.innerHTML = `${isCorrect ? '✓' : '✕'} ${clean}`;
+
+                chip.addEventListener('click', () => {
+                    $$('.pronounce-chip').forEach(c => c.classList.remove('selected'));
+                    chip.classList.add('selected');
+                    pronunciationManager.inspectWord(clean, chip);
+                });
+
+                dom.pronounceChipsContainer.appendChild(chip);
+            });
+        },
+
+        inspectWord(word, chipEl) {
+            this.selectedWord = word;
+            dom.pronounceWordDetailCard.classList.remove('hidden');
+            dom.pwdWordText.textContent = word;
+            dom.pwdTestFeedback.classList.add('hidden');
+
+            // Approximate phonetic Tamil spelling guide
+            const phoneticMap = {
+                'coffee': 'காஃபி', 'morning': 'மார்னிங்', 'fresh': 'ஃப்ரெஷ்', 'delicious': 'டெலிஷியஸ்',
+                'aroma': 'அரோமா', 'traditional': 'டிரடிஷனல்', 'special': 'ஸ்பெஷல்', 'energy': 'எனர்ஜி',
+                'comfortable': 'கம்ஃபர்டபிள்', 'crucial': 'க்ரூ-ஷல்', 'explore': 'எக்ஸ்ப்ளோர்',
+                'grateful': 'கிரேட்ஃபுல்', 'schedule': 'ஷெட்யூல்', 'challenge': 'சேலஞ்ச்'
+            };
+            const phonetic = phoneticMap[word] || `${word} (கேட்டுப் பழகவும்)`;
+            dom.pwdTamilPhonetic.textContent = `🗣️ ${phonetic}`;
+
+            // Check dictionary for meaning
+            const dict = wordsManager.dictionaryCache[word] || { ta: 'இந்த வார்த்தையைக் கேட்டுப் பழகவும்' };
+            dom.pwdTamilMeaning.textContent = `📖 ${dict.ta || 'உச்சரிப்புப் பயிற்சி'}`;
+
+            // Listen button
+            dom.pwdListenBtn.onclick = () => {
+                voiceManager.speakEnglish(word);
+            };
+
+            // Test Single Word Mic Button
+            dom.pwdPracticeBtn.onclick = () => {
+                pronunciationManager.testSingleWord(word, chipEl);
+            };
+        },
+
+        testSingleWord(targetWord, chipEl) {
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            if (!SpeechRecognition) {
+                alert('Speech recognition is not supported in this browser.');
+                return;
+            }
+
+            dom.pwdTestFeedback.className = 'pwd-test-status';
+            dom.pwdTestFeedback.classList.remove('hidden');
+            dom.pwdTestFeedback.textContent = '🎙️ Listening... Say the word now!';
+
+            const rec = new SpeechRecognition();
+            rec.lang = 'en-US';
+            rec.continuous = false;
+            rec.interimResults = false;
+
+            rec.onresult = (e) => {
+                const heard = e.results[0][0].transcript.trim().toLowerCase().replace(/[^a-z]/g, '');
+                if (heard === targetWord || targetWord.includes(heard) || heard.includes(targetWord)) {
+                    dom.pwdTestFeedback.className = 'pwd-test-status success';
+                    dom.pwdTestFeedback.textContent = `🎉 Excellent! 100% Correct Pronunciation: "${heard}"`;
+                    if (chipEl) {
+                        chipEl.className = 'pronounce-chip correct';
+                        chipEl.innerHTML = `✓ ${targetWord}`;
+                    }
+                    voiceManager.speakTamil('அருமை! சரியான உச்சரிப்பு!');
+                } else {
+                    dom.pwdTestFeedback.className = 'pwd-test-status retry';
+                    dom.pwdTestFeedback.textContent = `Heard "${heard}". Try saying "${targetWord}" again!`;
+                }
+            };
+
+            rec.onerror = () => {
+                dom.pwdTestFeedback.className = 'pwd-test-status retry';
+                dom.pwdTestFeedback.textContent = 'Microphone could not hear. Please try clicking Test Word again.';
+            };
+
+            rec.start();
+        }
+    };
+
+    // ==========================================================
+    // 10.9. FEATURE 3: TAMIL TO ENGLISH VOICE CONVERTER
+    // ==========================================================
+    const voiceConverterManager = {
+        isRecording: false,
+        rec: null,
+        lastResult: null,
+
+        init() {
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            if (SpeechRecognition) {
+                const rec = new SpeechRecognition();
+                rec.lang = 'ta-IN'; // Tamil Speech Recognition
+                rec.continuous = false;
+                rec.interimResults = false;
+
+                rec.onresult = (e) => {
+                    const transcript = e.results[0][0].transcript.trim();
+                    if (transcript) {
+                        dom.converterTaInput.value = transcript;
+                        voiceConverterManager.convert();
+                    }
+                };
+
+                rec.onend = () => {
+                    this.isRecording = false;
+                    dom.converterTaMicBtn.classList.remove('recording');
+                    dom.converterTaMicLabel.textContent = 'தமிழில் பேசவும் (Click to Speak Tamil)';
+                };
+
+                rec.onerror = (e) => {
+                    this.isRecording = false;
+                    dom.converterTaMicBtn.classList.remove('recording');
+                    dom.converterTaMicLabel.textContent = 'தமிழில் பேசவும் (Click to Speak Tamil)';
+                    console.warn('Tamil Speech Rec error:', e.error);
+                };
+
+                this.rec = rec;
+            }
+        },
+
+        openModal() {
+            dom.taEnConverterModal.classList.remove('hidden');
+        },
+
+        closeModal() {
+            dom.taEnConverterModal.classList.add('hidden');
+            if (this.isRecording && this.rec) {
+                try { this.rec.stop(); } catch(e) {}
+            }
+        },
+
+        toggleTamilMic() {
+            if (!this.rec) {
+                alert('Tamil voice recognition is not supported on this browser. You can type in the box below!');
+                return;
+            }
+
+            if (this.isRecording) {
+                this.rec.stop();
+                this.isRecording = false;
+                dom.converterTaMicBtn.classList.remove('recording');
+                dom.converterTaMicLabel.textContent = 'தமிழில் பேசவும் (Click to Speak Tamil)';
+            } else {
+                voiceManager.stopSpeech();
+                this.isRecording = true;
+                dom.converterTaMicBtn.classList.add('recording');
+                dom.converterTaMicLabel.textContent = '🔴 கேட்கிறது... தமிழில் பேசுங்கள் (Listening Tamil...)';
+                try {
+                    this.rec.start();
+                } catch(e) {}
+            }
+        },
+
+        async convert() {
+            const tamilText = dom.converterTaInput.value.trim();
+            if (!tamilText) return;
+
+            dom.converterTranslateBtn.disabled = true;
+            dom.converterTranslateBtn.textContent = '⏳ Translating to Fluent English...';
+
+            const prompt = `You are an expert spoken English coach for Tamil speakers.
+Convert this Tamil sentence into natural, fluent Spoken English:
+"${tamilText}"
+
+Respond ONLY with valid JSON in this exact structure:
+{
+  "primaryEn": "most natural fluent spoken English sentence",
+  "phoneticTa": "Tamil letters spelling out how to pronounce the English words",
+  "formalEn": "formal office or professional variation",
+  "casualEn": "casual friendly variation with friends"
+}`;
+
+            try {
+                const raw = await aiEngine.generateReply(prompt);
+                const match = raw.match(/\{[\s\S]*\}/);
+                let data = null;
+                if (match) {
+                    try { data = JSON.parse(match[0]); } catch(e) {}
+                }
+
+                if (!data || !data.primaryEn) {
+                    data = {
+                        primaryEn: "Could you please help me with this?",
+                        phoneticTa: "குட் யூ ப்ளீஸ் ஹெல்ப் மீ வித் திஸ்?",
+                        formalEn: "I would appreciate your assistance regarding this matter.",
+                        casualEn: "Can you give me a hand with this?"
+                    };
+                }
+
+                this.lastResult = data;
+                dom.convPrimaryEn.textContent = data.primaryEn;
+                dom.convPhoneticTa.textContent = data.phoneticTa;
+                dom.convFormalEn.textContent = data.formalEn;
+                dom.convCasualEn.textContent = data.casualEn;
+                dom.converterResults.classList.remove('hidden');
+
+                // Auto speak primary English
+                voiceManager.speakEnglish(data.primaryEn);
+            } catch (err) {
+                console.warn('Tamil conversion error:', err);
+            } finally {
+                dom.converterTranslateBtn.disabled = false;
+                dom.converterTranslateBtn.textContent = '✨ Convert to Fluent English (ஆங்கிலமாக மாற்று)';
+            }
         }
     };
 
@@ -2932,6 +3389,47 @@ Respond ONLY as a valid JSON object formatted as:
         });
 
         // Send & Mic
+        // Feature 1: Live Voice Call Event Listeners
+        if (dom.topbarCallBtn) dom.topbarCallBtn.addEventListener('click', () => callManager.startCall());
+        if (dom.chatCallTrigger) dom.chatCallTrigger.addEventListener('click', () => callManager.startCall());
+        if (dom.callExitBtn) dom.callExitBtn.addEventListener('click', () => callManager.endCall());
+        if (dom.callHangupBtn) dom.callHangupBtn.addEventListener('click', () => callManager.endCall());
+        if (dom.callMicToggleBtn) dom.callMicToggleBtn.addEventListener('click', () => callManager.toggleMute());
+        if (dom.callRepeatAudioBtn) dom.callRepeatAudioBtn.addEventListener('click', () => callManager.repeatLastAudio());
+
+        // Feature 3: Tamil to English Voice Converter Listeners
+        if (dom.chatTaConvTrigger) dom.chatTaConvTrigger.addEventListener('click', () => voiceConverterManager.openModal());
+        if (dom.taTranslateMicBtn) dom.taTranslateMicBtn.addEventListener('click', () => voiceConverterManager.openModal());
+        if (dom.converterCloseBtn) dom.converterCloseBtn.addEventListener('click', () => voiceConverterManager.closeModal());
+        if (dom.converterTaMicBtn) dom.converterTaMicBtn.addEventListener('click', () => voiceConverterManager.toggleTamilMic());
+        if (dom.converterTranslateBtn) dom.converterTranslateBtn.addEventListener('click', () => voiceConverterManager.convert());
+
+        if (dom.convSpeakPrimary) dom.convSpeakPrimary.addEventListener('click', () => {
+            if (voiceConverterManager.lastResult) voiceManager.speakEnglish(voiceConverterManager.lastResult.primaryEn);
+        });
+        if (dom.convSpeakFormal) dom.convSpeakFormal.addEventListener('click', () => {
+            if (voiceConverterManager.lastResult) voiceManager.speakEnglish(voiceConverterManager.lastResult.formalEn);
+        });
+        if (dom.convSpeakCasual) dom.convSpeakCasual.addEventListener('click', () => {
+            if (voiceConverterManager.lastResult) voiceManager.speakEnglish(voiceConverterManager.lastResult.casualEn);
+        });
+        if (dom.convSendChatBtn) dom.convSendChatBtn.addEventListener('click', () => {
+            if (voiceConverterManager.lastResult) {
+                voiceConverterManager.closeModal();
+                tabManager.switchTab('chat');
+                dom.textInput.value = voiceConverterManager.lastResult.primaryEn;
+                chatManager.sendMessage();
+            }
+        });
+        if (dom.convCopyBtn) dom.convCopyBtn.addEventListener('click', () => {
+            if (voiceConverterManager.lastResult) {
+                navigator.clipboard.writeText(voiceConverterManager.lastResult.primaryEn);
+                dom.convCopyBtn.textContent = '✓ Copied!';
+                setTimeout(() => { dom.convCopyBtn.textContent = '📋 Copy English'; }, 2000);
+            }
+        });
+
+        // Send & Mic
         dom.sendBtn.addEventListener('click', chatManager.sendMessage);
         dom.micBtn.addEventListener('click', voiceManager.toggleRecording);
 
@@ -3083,6 +3581,8 @@ Respond ONLY as a valid JSON object formatted as:
 
         // Initialize sub-systems
         voiceManager.init();
+        callManager.init();
+        voiceConverterManager.init();
         chatManager.renderWelcome();
         tensesManager.renderTenses('all');
         tensesManager.fetchNewAITenseQuiz();
