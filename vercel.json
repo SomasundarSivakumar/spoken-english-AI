@@ -1,0 +1,9 @@
+{
+  "cleanUrls": true,
+  "rewrites": [
+    {
+      "source": "/__/auth/(.*)",
+      "destination": "https://spoken-english-ff3df.firebaseapp.com/__/auth/$1"
+    }
+  ]
+}

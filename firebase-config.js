@@ -186,40 +186,54 @@
                 throw new Error('CONFIG_REQUIRED');
             }
 
+            // Detect in-app browsers (Instagram, WhatsApp, Facebook, LinkedIn webviews)
+            // where Google blocks OAuth sign-ins with 403: disallowed_useragent
+            const isInApp = /FBAN|FBAV|Instagram|Line|Twitter|MicroMessenger|WhatsApp/i.test(navigator.userAgent);
+            if (isInApp) {
+                throw new Error('IN_APP_BROWSER');
+            }
+
             const provider = new firebase.auth.GoogleAuthProvider();
             provider.addScope('profile');
             provider.addScope('email');
             provider.setCustomParameters({ prompt: 'select_account' });
 
-            // Mobile detection: Mobile browsers (Chrome Android, Safari iOS, in-app webviews)
-            // block popups by default. signInWithRedirect provides seamless native mobile login.
-            const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
-                || (window.innerWidth <= 768)
-                || (window.matchMedia && window.matchMedia('(pointer: coarse)').matches);
-
-            if (isMobile) {
-                console.log('Mobile device detected — initiating Firebase signInWithRedirect');
-                return await this.auth.signInWithRedirect(provider);
+            // Ensure session persistence is explicitly set to LOCAL storage
+            try {
+                if (firebase.auth.Auth && firebase.auth.Auth.Persistence && firebase.auth.Auth.Persistence.LOCAL) {
+                    await this.auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);
+                }
+            } catch (pErr) {
+                console.warn('Set persistence note:', pErr);
             }
 
-            // Desktop flow: try popup first, automatically fallback to redirect if popup is blocked
+            // Use signInWithPopup first for ALL devices (including mobile).
+            // On mobile Chrome & Safari, user-click-triggered popups work cleanly and avoid
+            // cross-origin cookie loss (which causes Vercel mobile redirects to lose login state).
             try {
                 const result = await this.auth.signInWithPopup(provider);
-                this.currentUser = result.user;
-                localStorage.setItem('sw_cached_user', JSON.stringify({
-                    uid: result.user.uid,
-                    displayName: result.user.displayName,
-                    email: result.user.email,
-                    photoURL: result.user.photoURL
-                }));
-                document.documentElement.classList.add('user-cached-logged-in');
-                await this.syncUserToCloud(result.user);
-                this.notifyAuthListeners(result.user);
-                return result.user;
+                if (result && result.user) {
+                    this.currentUser = result.user;
+                    localStorage.setItem('sw_cached_user', JSON.stringify({
+                        uid: result.user.uid,
+                        displayName: result.user.displayName,
+                        email: result.user.email,
+                        photoURL: result.user.photoURL
+                    }));
+                    document.documentElement.classList.add('user-cached-logged-in');
+                    await this.syncUserToCloud(result.user);
+                    this.notifyAuthListeners(result.user);
+                    return result.user;
+                }
             } catch (error) {
-                console.warn('Popup login notice, evaluating redirect fallback:', error);
-                if (error.code === 'auth/popup-blocked' || error.code === 'auth/popup-closed-by-user' || error.code === 'auth/cancelled-popup-request') {
-                    console.log('Popup blocked or cancelled, falling back to signInWithRedirect...');
+                console.warn('Popup login notice, evaluating fallback:', error);
+                // User intentionally closed the popup
+                if (error.code === 'auth/popup-closed-by-user') {
+                    return null;
+                }
+                // If popup was blocked by browser security, fallback to redirect
+                if (error.code === 'auth/popup-blocked' || error.code === 'auth/cancelled-popup-request') {
+                    console.log('Popup blocked by browser, falling back to signInWithRedirect...');
                     return await this.auth.signInWithRedirect(provider);
                 }
                 throw error;

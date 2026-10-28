@@ -3398,7 +3398,11 @@ Respond ONLY as a valid JSON object formatted as:
                 let msg = err.message || 'Error connecting to Google.';
                 const currentHost = window.location.hostname;
 
-                if (err.code === 'auth/unauthorized-domain') {
+                if (err.message === 'IN_APP_BROWSER') {
+                    msg = `⚠️ <strong>In-App Browser Detected</strong><br>
+                    Google blocks login inside apps like WhatsApp or Instagram.<br><br>
+                    <strong>Easy Fix:</strong> Tap the <strong>⋮ (3 dots)</strong> at the top-right and choose <strong>"Open in Chrome"</strong> or <strong>"Open in Safari"</strong>.`;
+                } else if (err.code === 'auth/unauthorized-domain') {
                     msg = `⚠️ <strong>Domain Unauthorized in Firebase</strong><br>
                     Firebase is blocking logins from <code>${currentHost}</code>.<br><br>
                     <strong>Fix in 1 minute:</strong><br>
