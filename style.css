@@ -3914,6 +3914,12 @@ html.user-cached-logged-in #app.auth-locked {
     border: 1px solid rgba(255, 255, 255, 0.08);
 }
 
+.call-caption-bubble.user.interim {
+    opacity: 0.88;
+    border: 1px dashed rgba(255, 255, 255, 0.5);
+    background: linear-gradient(135deg, rgba(79, 70, 229, 0.7) 0%, rgba(67, 56, 202, 0.7) 100%);
+}
+
 .call-caption-bubble.user {
     align-self: flex-end;
     background: linear-gradient(135deg, #4f46e5 0%, #4338ca 100%);

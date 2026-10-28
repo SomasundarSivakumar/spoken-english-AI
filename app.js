@@ -975,7 +975,7 @@ Call her lovingly as 'Eli ma ❤️' or 'Eli dear', tell her 'Love you so much E
             }
         },
 
-        speakEnglish(text) {
+        speakEnglish(text, onEnd) {
             voiceManager.stopSpeech();
             // Clean text: strip Tamil characters and emojis
             const cleanEn = text
@@ -986,7 +986,10 @@ Call her lovingly as 'Eli ma ❤️' or 'Eli dear', tell her 'Love you so much E
                 .replace(/[*#_`]/g, '')
                 .trim();
 
-            if (!cleanEn) return;
+            if (!cleanEn) {
+                if (typeof onEnd === 'function') onEnd();
+                return;
+            }
 
             const utt = new SpeechSynthesisUtterance(cleanEn);
             utt.rate = state.voiceRate;
@@ -996,12 +999,37 @@ Call her lovingly as 'Eli ma ❤️' or 'Eli dear', tell her 'Love you so much E
             if (state.voices[voiceIdx]) {
                 utt.voice = state.voices[voiceIdx];
             }
+
+            let finished = false;
+            const finishOnce = () => {
+                if (!finished) {
+                    finished = true;
+                    if (typeof onEnd === 'function') onEnd();
+                }
+            };
+
+            utt.onend = finishOnce;
+            utt.onerror = finishOnce;
+
+            // Safety timeout: Chrome occasionally drops onend for speech synthesis
+            const approxDurationMs = Math.max(1500, Math.round((cleanEn.split(/\s+/).length / (2.5 * state.voiceRate)) * 1000) + 1500);
+            const safetyTimer = setTimeout(finishOnce, approxDurationMs);
+
+            const origOnEnd = utt.onend;
+            utt.onend = () => {
+                clearTimeout(safetyTimer);
+                finishOnce();
+            };
+
             state.synth.speak(utt);
         },
 
-        speakTamil(tamilText) {
+                speakTamil(tamilText, onEnd) {
             voiceManager.stopSpeech();
-            if (!tamilText) return;
+            if (!tamilText) {
+                if (typeof onEnd === 'function') onEnd();
+                return;
+            }
 
             // Clean text: strip Markdown, header tags, bullet points, asterisks
             let clean = tamilText
@@ -1011,20 +1039,24 @@ Call her lovingly as 'Eli ma ❤️' or 'Eli dear', tell her 'Love you so much E
                 .replace(/^[-•*]\s+/gm, '')
                 .trim();
 
-            if (!clean) return;
+            if (!clean) {
+                if (typeof onEnd === 'function') onEnd();
+                return;
+            }
 
             // Extract sentences that have Tamil script
             const rawSentences = clean.split(/[.!?;:\n]+/).map(s => s.trim()).filter(Boolean);
             const tamilSentences = rawSentences.filter(s => /[\u0B80-\u0BFF]/.test(s));
             const sentencesToSpeak = tamilSentences.length > 0 ? tamilSentences : [clean];
 
-            // Limit to first 3 clear sentences (max 180 chars each) for pleasant spoken delivery
-            const queue = sentencesToSpeak.slice(0, 3).map(s => s.substring(0, 180));
+            // Limit to first 2 short clear sentences for conversation flow
+            const queue = sentencesToSpeak.slice(0, 2).map(s => s.substring(0, 150));
 
             let queueIdx = 0;
             const playNext = () => {
                 if (queueIdx >= queue.length) {
                     state.currentAudio = null;
+                    if (typeof onEnd === 'function') onEnd();
                     return;
                 }
                 const chunk = queue[queueIdx++];
@@ -1040,20 +1072,19 @@ Call her lovingly as 'Eli ma ❤️' or 'Eli dear', tell her 'Love you so much E
 
                 audio.onerror = (e) => {
                     console.warn('API TTS failed, falling back to browser synthesis:', e);
-                    voiceManager.speakTamilBrowserFallback(chunk);
-                    playNext();
+                    voiceManager.speakTamilBrowserFallback(chunk, () => playNext());
                 };
 
                 audio.play().catch(err => {
                     console.warn('Audio play blocked or failed:', err);
-                    voiceManager.speakTamilBrowserFallback(chunk);
+                    voiceManager.speakTamilBrowserFallback(chunk, () => playNext());
                 });
             };
 
             playNext();
         },
 
-        speakTamilBrowserFallback(cleanTa) {
+        speakTamilBrowserFallback(cleanTa, onEnd) {
             const allVoices = state.synth.getVoices();
             const taVoice = allVoices.find(v => v.lang.startsWith('ta'));
             const utt = new SpeechSynthesisUtterance(cleanTa);
@@ -1063,6 +1094,10 @@ Call her lovingly as 'Eli ma ❤️' or 'Eli dear', tell her 'Love you so much E
             }
             utt.rate = 0.9;
             utt.pitch = 1.0;
+            if (typeof onEnd === 'function') {
+                utt.onend = () => onEnd();
+                utt.onerror = () => onEnd();
+            }
             state.synth.speak(utt);
         },
 
@@ -2720,59 +2755,33 @@ Respond ONLY as a valid JSON object formatted as:
         isActive: false,
         isMuted: false,
         isSpeaking: false,
+        isThinking: false,
         rec: null,
         lastAiText: '',
-        callHistory: [],
+        interimBubble: null,
+        reconnectTimer: null,
 
         init() {
-            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-            if (SpeechRecognition) {
-                const rec = new SpeechRecognition();
-                rec.lang = 'en-US';
-                rec.continuous = false;
-                rec.interimResults = false;
-
-                rec.onresult = (e) => {
-                    const transcript = e.results[0][0].transcript.trim();
-                    if (transcript && callManager.isActive) {
-                        callManager.handleUserSpeech(transcript);
-                    }
-                };
-
-                rec.onerror = (e) => {
-                    if (callManager.isActive && !callManager.isSpeaking && !callManager.isMuted) {
-                        setTimeout(() => {
-                            if (callManager.isActive && !callManager.isSpeaking && !callManager.isMuted) {
-                                callManager.startListening();
-                            }
-                        }, 600);
-                    }
-                };
-
-                rec.onend = () => {
-                    if (callManager.isActive && !callManager.isSpeaking && !callManager.isMuted && !dom.callPulseWrap.classList.contains('thinking')) {
-                        setTimeout(() => {
-                            if (callManager.isActive && !callManager.isSpeaking && !callManager.isMuted) {
-                                callManager.startListening();
-                            }
-                        }, 500);
-                    }
-                };
-
-                this.rec = rec;
-            }
+            // SpeechRecognition is checked and initialized dynamically per turn
         },
 
         startCall() {
             this.isActive = true;
             this.isMuted = false;
+            this.isSpeaking = false;
+            this.isThinking = false;
+            this.stopRecognition();
+            voiceManager.stopSpeech();
+
             dom.aiCallModal.classList.remove('hidden');
             dom.callPulseWrap.className = 'call-avatar-pulse-wrap speaking';
             dom.callStateHint.textContent = '🔊 Connected! AI is introducing...';
             dom.callMicText.textContent = 'Speaking';
             dom.callMicToggleBtn.classList.add('active');
 
-            // Initial welcoming statement
+            // Clear previous captions
+            dom.callCaptionsList.innerHTML = '';
+
             let welcomeEn = "Hello! I am Queen Rat AI, your personal English speaking partner. How are you doing today?";
             let welcomeTa = "வணக்கம்! என்னிடம் ஆங்கிலத்திலோ அல்லது தமிழிலோ தயங்காமல் பேசுங்கள்!";
 
@@ -2783,71 +2792,203 @@ Respond ONLY as a valid JSON object formatted as:
             this.lastAiText = `${welcomeEn} ${welcomeTa}`;
             this.appendCaption('ai', `${welcomeEn} (${welcomeTa})`);
 
+            this.isSpeaking = true;
             voiceManager.speakEnglish(welcomeEn, () => {
                 if (this.isActive) {
+                    this.isSpeaking = false;
                     this.startListening();
                 }
             });
         },
 
+        stopRecognition() {
+            if (this.reconnectTimer) {
+                clearTimeout(this.reconnectTimer);
+                this.reconnectTimer = null;
+            }
+            if (this.rec) {
+                try {
+                    this.rec.onresult = null;
+                    this.rec.onerror = null;
+                    this.rec.onend = null;
+                    this.rec.abort();
+                } catch (e) {}
+                this.rec = null;
+            }
+        },
+
         startListening() {
-            if (!this.isActive || this.isMuted) return;
-            this.isSpeaking = false;
+            if (!this.isActive || this.isMuted || this.isSpeaking || this.isThinking) return;
+
+            this.stopRecognition();
+
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            if (!SpeechRecognition) {
+                dom.callStateHint.textContent = '⚠️ Mic not supported in this browser. Please use Chrome or Edge.';
+                return;
+            }
+
             dom.callPulseWrap.className = 'call-avatar-pulse-wrap listening';
             dom.callStateHint.textContent = '🎙️ Listening to you... Speak in English or தமிழ்';
+
+            let finalTranscript = '';
+            const rec = new SpeechRecognition();
+            rec.lang = 'en-US';
+            rec.continuous = false;
+            rec.interimResults = true;
+
+            rec.onresult = (e) => {
+                let interim = '';
+                for (let i = e.resultIndex; i < e.results.length; i++) {
+                    const text = e.results[i][0].transcript;
+                    if (e.results[i].isFinal) {
+                        finalTranscript += text + ' ';
+                    } else {
+                        interim += text;
+                    }
+                }
+
+                const liveText = (finalTranscript + interim).trim();
+                if (liveText) {
+                    this.showInterimCaption(liveText);
+                    dom.callStateHint.textContent = `🎙️ "${liveText}"`;
+                }
+            };
+
+            rec.onerror = (e) => {
+                console.warn('Call speech error:', e.error);
+                if (e.error === 'not-allowed') {
+                    dom.callStateHint.textContent = '⚠️ Microphone permission denied. Please allow mic in browser!';
+                    return;
+                }
+                // If silence or network hiccup, auto restart listening
+                if (this.isActive && !this.isSpeaking && !this.isThinking && !this.isMuted) {
+                    this.reconnectTimer = setTimeout(() => {
+                        if (this.isActive && !this.isSpeaking && !this.isThinking && !this.isMuted) {
+                            this.startListening();
+                        }
+                    }, 500);
+                }
+            };
+
+            rec.onend = () => {
+                this.rec = null;
+                const userSpeech = finalTranscript.trim();
+                this.removeInterimCaption();
+
+                if (userSpeech && this.isActive) {
+                    this.handleUserSpeech(userSpeech);
+                } else if (this.isActive && !this.isSpeaking && !this.isThinking && !this.isMuted) {
+                    // Kept silent, re-arm listening
+                    this.reconnectTimer = setTimeout(() => {
+                        if (this.isActive && !this.isSpeaking && !this.isThinking && !this.isMuted) {
+                            this.startListening();
+                        }
+                    }, 350);
+                }
+            };
+
             try {
-                if (this.rec) this.rec.start();
-            } catch (err) {}
+                this.rec = rec;
+                rec.start();
+            } catch (err) {
+                console.warn('Call rec start error:', err);
+            }
+        },
+
+        showInterimCaption(text) {
+            if (!this.interimBubble) {
+                this.interimBubble = document.createElement('div');
+                this.interimBubble.className = 'call-caption-bubble user interim';
+                dom.callCaptionsList.appendChild(this.interimBubble);
+            }
+            this.interimBubble.innerHTML = `<span class="speaker-tag">You (Speaking):</span><p>${chatManager.escapeHtml(text)}</p>`;
+            dom.callCaptionsList.parentElement.scrollTop = dom.callCaptionsList.parentElement.scrollHeight;
+        },
+
+        removeInterimCaption() {
+            if (this.interimBubble) {
+                this.interimBubble.remove();
+                this.interimBubble = null;
+            }
         },
 
         async handleUserSpeech(userText) {
+            this.stopRecognition();
+            this.isThinking = true;
+            this.isSpeaking = false;
+
             this.appendCaption('user', userText);
             dom.callPulseWrap.className = 'call-avatar-pulse-wrap thinking';
             dom.callStateHint.textContent = '⏳ AI is thinking of reply...';
 
-            const callPrompt = `You are Queen Rat AI in a live spoken phone call conversation with a Tamil learner. 
-The user just said: "${userText}". 
-Respond in:
-1. Max 2 short, conversational, polite spoken English sentences.
-2. Followed by 1 short Tamil helpful explanation or friendly follow-up question.
-Format:
-English: [English reply]
-Tamil: [Tamil reply]`;
+            const callPrompt = `You are Queen Rat AI in a live spoken voice call with a Tamil learner.
+The learner just spoke: "${userText}".
+Respond strictly in this 2-line format:
+English: [1 to 2 short conversational spoken English sentences, friendly and natural]
+Tamil: [1 short Tamil sentence with meaning or friendly follow-up]`;
 
             try {
                 const rawReply = await aiEngine.generateReply(callPrompt);
-                let enPart = rawReply;
+                this.isThinking = false;
+
+                if (!this.isActive) return;
+
+                let enPart = '';
                 let taPart = '';
 
-                const enMatch = rawReply.match(/English:\\s*([^\\n]+)/i);
-                const taMatch = rawReply.match(/Tamil:\\s*([^\\n]+)/i);
-                if (enMatch) enPart = enMatch[1].trim();
-                if (taMatch) taPart = taMatch[1].trim();
+                const enMatch = rawReply.match(/English:\s*([^\n]+)/i);
+                const taMatch = rawReply.match(/Tamil:\s*([^\n]+)/i);
 
-                this.lastAiText = `${enPart} ${taPart}`;
+                if (enMatch && enMatch[1]) {
+                    enPart = enMatch[1].trim();
+                }
+                if (taMatch && taMatch[1]) {
+                    taPart = taMatch[1].trim();
+                }
+
+                // If structure wasn't followed, extract lines cleanly
+                if (!enPart) {
+                    const lines = rawReply.split('\n').map(l => l.trim()).filter(Boolean);
+                    enPart = lines[0] ? lines[0].replace(/^(English|Assistant|AI):\s*/i, '').trim() : "I heard you! Let's continue practicing English.";
+                    if (lines[1]) {
+                        taPart = lines[1].replace(/^(Tamil|Meaning|விளக்கம்):\s*/i, '').trim();
+                    }
+                }
+
+                this.lastAiText = `${enPart} ${taPart}`.trim();
                 this.appendCaption('ai', `${enPart} ${taPart ? '— ' + taPart : ''}`);
 
                 if (this.isActive) {
                     this.isSpeaking = true;
                     dom.callPulseWrap.className = 'call-avatar-pulse-wrap speaking';
-                    dom.callStateHint.textContent = '🔊 AI is speaking to you...';
+                    dom.callStateHint.textContent = '🔊 AI is speaking...';
+
                     voiceManager.speakEnglish(enPart, () => {
-                        if (taPart && this.isActive) {
+                        if (!this.isActive) return;
+                        if (taPart) {
                             voiceManager.speakTamil(taPart, () => {
-                                if (this.isActive) this.startListening();
+                                if (this.isActive) {
+                                    this.isSpeaking = false;
+                                    this.startListening();
+                                }
                             });
-                        } else if (this.isActive) {
+                        } else {
+                            this.isSpeaking = false;
                             this.startListening();
                         }
                     });
                 }
             } catch (err) {
-                console.warn('Call AI error:', err);
+                console.warn('Call AI reply error:', err);
+                this.isThinking = false;
+                this.isSpeaking = false;
                 if (this.isActive) this.startListening();
             }
         },
 
         appendCaption(speaker, text) {
+            this.removeInterimCaption();
             const bubble = document.createElement('div');
             bubble.className = `call-caption-bubble ${speaker}`;
             bubble.innerHTML = `<span class="speaker-tag">${speaker === 'ai' ? 'AI Tutor' : 'You'}:</span><p>${chatManager.escapeHtml(text)}</p>`;
@@ -2858,12 +2999,11 @@ Tamil: [Tamil reply]`;
         toggleMute() {
             this.isMuted = !this.isMuted;
             if (this.isMuted) {
-                if (this.rec) {
-                    try { this.rec.stop(); } catch(e) {}
-                }
+                this.stopRecognition();
                 dom.callMicToggleBtn.classList.remove('active');
                 dom.callMicText.textContent = 'Muted';
                 dom.callStateHint.textContent = '🔇 Microphone is Muted';
+                dom.callPulseWrap.className = 'call-avatar-pulse-wrap';
             } else {
                 dom.callMicToggleBtn.classList.add('active');
                 dom.callMicText.textContent = 'Speaking';
@@ -2872,22 +3012,32 @@ Tamil: [Tamil reply]`;
         },
 
         repeatLastAudio() {
-            if (!this.lastAiText) return;
+            if (!this.lastAiText || !this.isActive) return;
+            this.stopRecognition();
+            this.isSpeaking = true;
+            dom.callPulseWrap.className = 'call-avatar-pulse-wrap speaking';
+            dom.callStateHint.textContent = '🔊 Repeating AI voice...';
+
             voiceManager.speakEnglish(this.lastAiText, () => {
-                if (this.isActive && !this.isMuted) this.startListening();
+                if (this.isActive && !this.isMuted) {
+                    this.isSpeaking = false;
+                    this.startListening();
+                }
             });
         },
 
         endCall() {
             this.isActive = false;
             this.isSpeaking = false;
-            if (this.rec) {
-                try { this.rec.stop(); } catch(e) {}
-            }
+            this.isThinking = false;
+            this.isMuted = false;
+            this.stopRecognition();
+            this.removeInterimCaption();
             voiceManager.stopSpeech();
             dom.aiCallModal.classList.add('hidden');
         }
     };
+
 
     // ==========================================================
     // 10.8. FEATURE 2: PRONUNCIATION ACCURACY HIGHLIGHTER & DRILL
