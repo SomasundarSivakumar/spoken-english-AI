@@ -2593,9 +2593,49 @@ input, textarea, select {
     margin: 4px 0;
 }
 
-@media (max-width: 480px) {
+/* Mobile Login Optimization: Remove the 4 feature boxes & make modal sleek & compact */
+@media (max-width: 768px) {
     .auth-gate-features {
-        grid-template-columns: 1fr;
+        display: none !important;
+    }
+    .auth-gate-overlay {
+        padding: 16px;
+    }
+    .auth-gate-card {
+        padding: 32px 22px;
+        border-radius: 22px;
+        gap: 18px;
+        max-width: 380px;
+        box-shadow: 0 20px 50px rgba(0, 0, 0, 0.85), 0 0 35px rgba(99, 102, 241, 0.25);
+    }
+    .auth-gate-header {
+        flex-direction: column;
+        gap: 12px;
+    }
+    .auth-gate-logo {
+        width: 64px;
+        height: 64px;
+    }
+    .auth-gate-brand h2 {
+        text-align: center;
+        font-size: 1.45rem;
+    }
+    .auth-gate-tagline {
+        text-align: center;
+        font-size: 0.82rem;
+    }
+    .auth-gate-hero h3 {
+        font-size: 1.12rem;
+        margin-bottom: 6px;
+    }
+    .auth-gate-hero p {
+        font-size: 0.85rem;
+        line-height: 1.5;
+        color: #94a3b8;
+    }
+    .gate-google-btn {
+        padding: 14px 20px;
+        font-size: 0.98rem;
     }
 }
 

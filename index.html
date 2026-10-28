@@ -19,7 +19,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css?v=6">
+    <link rel="stylesheet" href="style.css?v=7">
     <link rel="icon" type="image/png" href="logo.png">
     <link rel="apple-touch-icon" href="logo.png">
     <!-- Firebase SDK (Compat for reliable vanilla JS execution) -->
@@ -386,9 +386,6 @@
                             <button id="ai-generate-batch-words-btn" class="btn-ai-outline">
                                 📚 Generate 5 New Words
                             </button>
-                            <button id="ai-vocab-quiz-btn" class="btn-ai-outline">
-                                🎯 New Vocab Quiz
-                            </button>
                         </div>
                     </div>
 
@@ -424,16 +421,6 @@
                         <button class="vocab-cat-btn" data-cat="travel">✈️ Travel & Shopping (பயணம்)</button>
                     </div>
 
-                    <!-- Vocab Quiz Mini-Module -->
-                    <div class="vocab-quiz-container">
-                        <div class="quiz-header-row">
-                            <span class="quiz-title">⚡ Word Quiz: What is the Tamil meaning?</span>
-                            <span id="vocab-score-badge" class="score-pill">Score: 0</span>
-                        </div>
-                        <div id="vocab-quiz-card" class="vocab-quiz-card">
-                            <!-- Populated by JS -->
-                        </div>
-                    </div>
 
                     <!-- Words Cards Grid -->
                     <div id="words-grid" class="words-grid">
@@ -801,6 +788,6 @@
         </nav>
     </div>
 
-    <script src="app.js?v=7"></script>
+    <script src="app.js?v=11"></script>
 </body>
 </html>
